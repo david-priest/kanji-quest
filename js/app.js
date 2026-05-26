@@ -668,13 +668,15 @@ function renderQuizRun() {
           <button class="mcq-opt" data-opt="${escapeHtml(opt)}">${escapeHtml(opt)}</button>
         `).join("")}
       </div>
-      <div class="btn-row" style="justify-content:flex-end; margin-top:auto">
-        <button class="btn" data-act="next" disabled>${idx + 1 === list.length ? "Finish →" : "Next →"}</button>
-      </div>
     `;
 
     const optBtns = [...surface.querySelectorAll(".mcq-opt")];
-    const nextBtn = surface.querySelector('[data-act="next"]');
+
+    const advance = () => {
+      idx += 1;
+      if (idx >= list.length) showResults();
+      else renderQuestion();
+    };
 
     const pickOption = (btn) => {
       if (answered) return;
@@ -689,24 +691,22 @@ function renderQuizRun() {
         if (v === correct) b.classList.add("correct");
         else if (b === btn) b.classList.add("wrong");
       });
-      nextBtn.disabled = false;
-      nextBtn.focus();
+      toast(
+        isCorrect ? "good" : "bad",
+        isCorrect ? "Correct!" : `Nope — ${k.c} = ${correct}`,
+      );
+      // Auto-advance: snappier when correct, longer on wrong so the
+      // right answer is visible for a moment.
+      setTimeout(advance, isCorrect ? 600 : 1400);
     };
     optBtns.forEach((b) => b.addEventListener("click", () => pickOption(b)));
-    nextBtn.addEventListener("click", () => {
-      idx += 1;
-      if (idx >= list.length) showResults();
-      else renderQuestion();
-    });
 
     if (viewCleanup) viewCleanup();
     function onKey(e) {
-      if (!answered && e.code >= "Digit1" && e.code <= "Digit4") {
+      if (answered) return;
+      if (e.code >= "Digit1" && e.code <= "Digit4") {
         const i = Number(e.code.slice(-1)) - 1;
         if (optBtns[i]) { e.preventDefault(); pickOption(optBtns[i]); }
-      } else if (answered && (e.code === "Enter" || e.code === "Space")) {
-        e.preventDefault();
-        nextBtn.click();
       }
     }
     document.addEventListener("keydown", onKey);
