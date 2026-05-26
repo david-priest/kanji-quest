@@ -77,7 +77,24 @@ function dueCards(now = Date.now()) {
       if (k) out.push({ char, card, k });
     }
   }
+  // Sort by due time first, then shuffle within ~1-hour buckets so
+  // cards from the same learning batch don't always appear in a row.
   out.sort((a, b) => a.card.due - b.card.due);
+  const BUCKET = 60 * 60 * 1000;
+  let i = 0;
+  while (i < out.length) {
+    let j = i + 1;
+    while (j < out.length && out[j].card.due - out[i].card.due < BUCKET) j += 1;
+    if (j - i > 1) {
+      const slice = out.slice(i, j);
+      for (let k = slice.length - 1; k > 0; k--) {
+        const r = Math.floor(Math.random() * (k + 1));
+        [slice[k], slice[r]] = [slice[r], slice[k]];
+      }
+      for (let k = i; k < j; k++) out[k] = slice[k - i];
+    }
+    i = j;
+  }
   return out;
 }
 
@@ -400,17 +417,20 @@ function renderLearn() {
 }
 
 function pickDistractors(target, n) {
-  // Prefer same-level kanji with a real meaning; fall back to any kanji.
+  // Skip candidates whose first meaning is *anywhere* in the target's
+  // meaning list (avoids 'distractor that's actually correct').
+  const targetMeanings = new Set(target.m ?? []);
+  const isAmbiguous = (k) => {
+    const m = k.m?.[0];
+    return !m || targetMeanings.has(m);
+  };
   const pool = kanji.filter((k) =>
-    k.c !== target.c &&
-    k.n === target.n &&
-    (k.m ?? []).length > 0
+    k.c !== target.c && k.n === target.n && !isAmbiguous(k)
   );
   const fallback = kanji.filter((k) =>
-    k.c !== target.c && (k.m ?? []).length > 0
+    k.c !== target.c && !isAmbiguous(k)
   );
-  const seen = new Set();
-  seen.add((target.m ?? [])[0]);
+  const seen = new Set(targetMeanings);
   const picked = [];
   const tryPool = (arr) => {
     const shuffled = shuffle(arr.slice());
@@ -701,13 +721,14 @@ function renderInlineLevelDetail(level) {
 function showKanjiDetail(k) {
   const card = state.cards[k.c];
   const tier = card ? tierOf(card) : "unseen";
+  const isLeech = card && card.lapses >= 8;
   const dlg = document.createElement("div");
   dlg.className = "modal-backdrop";
   dlg.innerHTML = `
     <div class="modal">
       <button class="modal-close" aria-label="Close">×</button>
       <div class="modal-k">${k.c}</div>
-      <div class="modal-tier tier-${tier}">${tier}</div>
+      <div class="modal-tier tier-${tier}">${tier}${isLeech ? ' <span class="leech-badge" title="Many lapses — consider revisiting the mnemonic">leech</span>' : ""}</div>
       <div class="answer">
         <div class="row"><span class="label">Meaning</span>
           <span class="vals">${escapeHtml((k.m ?? []).slice(0,4).join(" · ") || "—")}</span></div>
