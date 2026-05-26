@@ -128,6 +128,8 @@ function render() {
     case "review":   return renderReview();
     case "settings": return renderSettings();
     case "mastery":  return renderMastery();
+    case "quiz":     return renderQuizSetup();
+    case "quiz-run": return renderQuizRun();
   }
 }
 
@@ -164,6 +166,17 @@ function renderHome() {
           }</div>
         </div>
         <div class="count">${newAvail}</div>
+      </button>
+      <button class="cta quiz" data-go="quiz" ${Object.keys(state.cards).length === 0 ? "disabled" : ""}>
+        <div>
+          <div class="label">Quiz</div>
+          <div class="sub">${
+            Object.keys(state.cards).length === 0
+              ? "Learn some kanji first"
+              : "Pick a scope, test recall"
+          }</div>
+        </div>
+        <div class="count">?</div>
       </button>
     </div>
   `;
@@ -499,6 +512,252 @@ function exampleHtml(char) {
       ${en}
     </div>
   `;
+}
+
+// ---------- Quiz (standalone MCQ, doesn't touch SRS) ------------------------
+
+function quizPrefs() {
+  const base = { tier: "apprentice", level: "any", count: 10 };
+  return { ...base, ...(state.settings.quiz ?? {}) };
+}
+
+function buildQuizPool(prefs) {
+  const out = [];
+  for (const [char, card] of Object.entries(state.cards)) {
+    const k = kanjiByChar.get(char);
+    if (!k) continue;
+    if (prefs.tier !== "any" && tierOf(card) !== prefs.tier) continue;
+    if (prefs.level !== "any" && k.n !== Number(prefs.level)) continue;
+    out.push(k);
+  }
+  return out;
+}
+
+function renderQuizSetup() {
+  const prefs = quizPrefs();
+  const pool = buildQuizPool(prefs);
+  const tiers = ["any", ...TIERS];
+  const levels = ["any", 5, 4, 3, 2, 1];
+
+  const wrap = document.createElement("section");
+  wrap.innerHTML = `
+    <div class="hero">
+      <h1>Quiz yourself</h1>
+      <p class="sub">Test recall on a custom set. Doesn't affect your SRS schedule.</p>
+    </div>
+
+    <div class="field">
+      <h3>Tier</h3>
+      <div class="opt-row" id="tier-row">
+        ${tiers.map((t) => `
+          <button class="opt ${prefs.tier === t ? "selected" : ""}" data-tier="${t}">${t === "any" ? "any" : t}</button>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="field">
+      <h3>JLPT level</h3>
+      <div class="opt-row" id="lvl-row">
+        ${levels.map((l) => `
+          <button class="opt ${String(prefs.level) === String(l) ? "selected" : ""}" data-lvl="${l}">${l === "any" ? "any" : "N" + l}</button>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="field">
+      <h3>Number of questions</h3>
+      <div class="field-row">
+        <input type="range" min="5" max="30" value="${prefs.count}" id="count" />
+        <strong id="count-val">${prefs.count}</strong>
+      </div>
+      <p class="quiz-pool-info" style="color:var(--text-dim); font-size:13px; margin:8px 0 0">
+        <span id="pool-count">${pool.length}</span> kanji available with this scope.
+      </p>
+    </div>
+
+    <div class="btn-row" style="justify-content:flex-end; gap:8px">
+      <button class="btn" data-go="home">Cancel</button>
+      <button class="btn btn-primary" id="start" ${pool.length === 0 ? "disabled" : ""}>
+        Start quiz →
+      </button>
+    </div>
+  `;
+  els.view.appendChild(wrap);
+
+  const refresh = () => {
+    const p = quizPrefs();
+    const pool = buildQuizPool(p);
+    wrap.querySelector("#pool-count").textContent = pool.length;
+    const startBtn = wrap.querySelector("#start");
+    startBtn.disabled = pool.length === 0;
+  };
+
+  wrap.querySelectorAll("[data-tier]").forEach((b) =>
+    b.addEventListener("click", () => {
+      state.settings.quiz = { ...quizPrefs(), tier: b.getAttribute("data-tier") };
+      persist();
+      renderQuizSetup_replace(wrap);
+    }),
+  );
+  wrap.querySelectorAll("[data-lvl]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const v = b.getAttribute("data-lvl");
+      state.settings.quiz = { ...quizPrefs(), level: v === "any" ? "any" : Number(v) };
+      persist();
+      renderQuizSetup_replace(wrap);
+    }),
+  );
+
+  const countSlider = wrap.querySelector("#count");
+  const countVal = wrap.querySelector("#count-val");
+  countSlider.addEventListener("input", () => { countVal.textContent = countSlider.value; });
+  countSlider.addEventListener("change", () => {
+    state.settings.quiz = { ...quizPrefs(), count: Number(countSlider.value) };
+    persist();
+  });
+
+  wrap.querySelector("[data-go]").addEventListener("click", () => go({ name: "home" }));
+  wrap.querySelector("#start").addEventListener("click", () => {
+    const p = quizPrefs();
+    const pool = buildQuizPool(p);
+    if (pool.length === 0) return;
+    const list = shuffle(pool).slice(0, Math.min(p.count, pool.length));
+    go({ name: "quiz-run", list });
+  });
+}
+
+// Re-render the setup view in-place after a pref change so the pool
+// count + selected state both refresh, without full route bounce.
+function renderQuizSetup_replace(oldWrap) {
+  oldWrap.remove();
+  renderQuizSetup();
+}
+
+function renderQuizRun() {
+  const list = route.list ?? [];
+  if (list.length === 0) {
+    showEmpty("🌱", "No kanji to quiz", "Pick a wider scope or learn some kanji first.");
+    return;
+  }
+
+  let idx = 0;
+  let correctCount = 0;
+  const misses = [];
+
+  const surface = document.createElement("section");
+  surface.className = "card-surface";
+  els.view.appendChild(surface);
+
+  function renderQuestion() {
+    const k = list[idx];
+    const correct = (k.m ?? [])[0] ?? "—";
+    const distractors = pickDistractors(k, 3);
+    const options = shuffle([correct, ...distractors]);
+    let answered = false;
+
+    surface.innerHTML = `
+      <div class="progress-line" style="width:${(idx / list.length) * 100}%"></div>
+      <div class="card-meta">
+        <span>Quiz · N${k.n}</span>
+        <span>${idx + 1} / ${list.length} · ✓ ${correctCount}</span>
+      </div>
+      <div class="kanji-big">${k.c}</div>
+      <div class="mcq-prompt">What does this kanji mean?</div>
+      <div class="mcq-options">
+        ${options.map((opt) => `
+          <button class="mcq-opt" data-opt="${escapeHtml(opt)}">${escapeHtml(opt)}</button>
+        `).join("")}
+      </div>
+      <div class="btn-row" style="justify-content:flex-end; margin-top:auto">
+        <button class="btn" data-act="next" disabled>${idx + 1 === list.length ? "Finish →" : "Next →"}</button>
+      </div>
+    `;
+
+    const optBtns = [...surface.querySelectorAll(".mcq-opt")];
+    const nextBtn = surface.querySelector('[data-act="next"]');
+
+    const pickOption = (btn) => {
+      if (answered) return;
+      answered = true;
+      const picked = btn.getAttribute("data-opt");
+      const isCorrect = picked === correct;
+      if (isCorrect) correctCount += 1;
+      else misses.push({ k, picked });
+      optBtns.forEach((b) => {
+        b.disabled = true;
+        const v = b.getAttribute("data-opt");
+        if (v === correct) b.classList.add("correct");
+        else if (b === btn) b.classList.add("wrong");
+      });
+      nextBtn.disabled = false;
+      nextBtn.focus();
+    };
+    optBtns.forEach((b) => b.addEventListener("click", () => pickOption(b)));
+    nextBtn.addEventListener("click", () => {
+      idx += 1;
+      if (idx >= list.length) showResults();
+      else renderQuestion();
+    });
+
+    if (viewCleanup) viewCleanup();
+    function onKey(e) {
+      if (!answered && e.code >= "Digit1" && e.code <= "Digit4") {
+        const i = Number(e.code.slice(-1)) - 1;
+        if (optBtns[i]) { e.preventDefault(); pickOption(optBtns[i]); }
+      } else if (answered && (e.code === "Enter" || e.code === "Space")) {
+        e.preventDefault();
+        nextBtn.click();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    viewCleanup = () => document.removeEventListener("keydown", onKey);
+  }
+
+  function showResults() {
+    if (viewCleanup) { viewCleanup(); viewCleanup = null; }
+    const pct = Math.round((correctCount / list.length) * 100);
+    els.view.innerHTML = "";
+    const e = document.createElement("section");
+    e.className = "empty";
+    e.innerHTML = `
+      <div class="emoji">${pct === 100 ? "🏅" : pct >= 80 ? "💪" : pct >= 50 ? "📚" : "🌱"}</div>
+      <h2>Quiz complete</h2>
+      <p>${correctCount} of ${list.length} correct (${pct}%)</p>
+      <div class="summary">
+        <div class="box"><div class="v" style="color:var(--green)">${correctCount}</div><div class="l">correct</div></div>
+        <div class="box"><div class="v" style="color:var(--red)">${misses.length}</div><div class="l">missed</div></div>
+        <div class="box"><div class="v" style="color:var(--blue)">${pct}%</div><div class="l">accuracy</div></div>
+      </div>
+      ${misses.length > 0 ? `
+        <h3 style="margin:18px 0 6px; font-size:13px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-mute)">Missed</h3>
+        <div class="kanji-grid" id="miss-grid"></div>
+      ` : ""}
+      <div class="btn-row" style="justify-content:center; margin-top:16px">
+        <button class="btn" data-go="home">Home</button>
+        <button class="btn" data-go="quiz">New quiz</button>
+        <button class="btn btn-primary" id="again">Quiz same again</button>
+      </div>
+    `;
+    els.view.appendChild(e);
+    e.querySelectorAll("[data-go]").forEach((b) =>
+      b.addEventListener("click", () => go({ name: b.getAttribute("data-go") })),
+    );
+    e.querySelector("#again").addEventListener("click", () => {
+      const reshuffled = shuffle(list.slice());
+      go({ name: "quiz-run", list: reshuffled });
+    });
+    const missGrid = e.querySelector("#miss-grid");
+    if (missGrid) {
+      for (const { k } of misses) {
+        const card = state.cards[k.c];
+        const tier = card ? tierOf(card) : "unseen";
+        missGrid.appendChild(renderKanjiCell(k, tier));
+      }
+    }
+    if (pct === 100 && list.length >= 5) burst(60);
+  }
+
+  renderQuestion();
 }
 
 // ---------- Review ----------------------------------------------------------

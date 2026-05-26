@@ -8,6 +8,7 @@ const defaultState = () => ({
     activeLevel: 5,        // start at N5
     learnChunkSize: 5,     // new kanji introduced per Learn session
     soundEnabled: true,
+    quiz: { tier: "apprentice", level: "any", count: 10 },
   },
   xp: { total: 0, byDay: {} },
   streak: { current: 0, longest: 0, lastDay: null },
