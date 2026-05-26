@@ -6,7 +6,7 @@ const defaultState = () => ({
   version: 1,
   settings: {
     activeLevel: 5,        // start at N5
-    dailyNewCap: 5,
+    learnChunkSize: 5,     // new kanji introduced per Learn session
     soundEnabled: true,
   },
   xp: { total: 0, byDay: {} },
@@ -22,10 +22,17 @@ export function loadState() {
     const parsed = JSON.parse(raw);
     // shallow merge so new fields appear on upgrades
     const base = defaultState();
+    const settings = { ...base.settings, ...(parsed.settings ?? {}) };
+    // Migrate legacy dailyNewCap → learnChunkSize (renamed once
+    // per-day-cap was removed in favour of per-session chunking).
+    if (settings.learnChunkSize == null && parsed.settings?.dailyNewCap != null) {
+      settings.learnChunkSize = parsed.settings.dailyNewCap;
+    }
+    delete settings.dailyNewCap;
     return {
       ...base,
       ...parsed,
-      settings: { ...base.settings, ...(parsed.settings ?? {}) },
+      settings,
       xp: { ...base.xp, ...(parsed.xp ?? {}) },
       streak: { ...base.streak, ...(parsed.streak ?? {}) },
       stats: { ...base.stats, ...(parsed.stats ?? {}) },

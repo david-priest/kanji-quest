@@ -234,7 +234,7 @@ function aggregateMastery() {
 // ---------- Learn (intro + MCQ check) ---------------------------------------
 
 function renderLearn() {
-  const chunk = Math.max(1, state.settings.dailyNewCap ?? 5);
+  const chunk = Math.max(1, state.settings.learnChunkSize ?? 5);
   const fullList = unseenInLevel();
   if (fullList.length === 0) {
     showEmpty(
@@ -804,8 +804,8 @@ function renderSettings() {
     <div class="field">
       <h3>Cards per learn session</h3>
       <div class="field-row">
-        <input type="range" min="1" max="20" value="${state.settings.dailyNewCap ?? 5}" id="cap" />
-        <strong id="cap-val">${state.settings.dailyNewCap ?? 5}</strong>
+        <input type="range" min="1" max="20" value="${state.settings.learnChunkSize ?? 5}" id="cap" />
+        <strong id="cap-val">${state.settings.learnChunkSize ?? 5}</strong>
       </div>
       <p style="color:var(--text-dim); font-size:13px; margin:8px 0 0">
         How many new kanji are introduced per Learn session. No daily limit —
@@ -848,7 +848,7 @@ function renderSettings() {
   const capVal = wrap.querySelector("#cap-val");
   cap.addEventListener("input", () => { capVal.textContent = cap.value; });
   cap.addEventListener("change", () => {
-    state.settings.dailyNewCap = Number(cap.value); persist();
+    state.settings.learnChunkSize = Number(cap.value); persist();
   });
 
   wrap.querySelector("#export").addEventListener("click", () => {
