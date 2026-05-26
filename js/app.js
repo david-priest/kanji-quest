@@ -131,6 +131,7 @@ function render() {
     case "mastery":  return renderMastery();
     case "quiz":     return renderQuizSetup();
     case "quiz-run": return renderQuizRun();
+    case "catchup":  return renderCatchup();
   }
 }
 
@@ -1282,6 +1283,18 @@ function renderSettings() {
     </div>
 
     <div class="field">
+      <h3>Quick catch-up</h3>
+      <p style="color:var(--text-dim); font-size:13px; margin:0 0 10px">
+        Lost your progress, or starting fresh after a long break? Paste in
+        the kanji you already know and pick a tier — they'll be added at
+        that mastery level so the app doesn't reintroduce them.
+      </p>
+      <div class="btn-row">
+        <button class="btn" data-go="catchup">Bulk-mark kanji as known…</button>
+      </div>
+    </div>
+
+    <div class="field">
       <h3>Danger zone</h3>
       <div class="btn-row">
         <button class="btn danger" id="reset">Reset all progress</button>
@@ -1301,6 +1314,10 @@ function renderSettings() {
       state.settings.activeLevel = Number(b.getAttribute("data-lvl"));
       persist(); renderSettings();
     }),
+  );
+
+  wrap.querySelectorAll("[data-go]").forEach((b) =>
+    b.addEventListener("click", () => go({ name: b.getAttribute("data-go") })),
   );
 
   const cap = wrap.querySelector("#cap");
@@ -1337,6 +1354,150 @@ function renderSettings() {
     state = loadState();
     persist(); go({ name: "home" });
   });
+}
+
+// ---------- Quick catch-up --------------------------------------------------
+
+function isKanjiChar(ch) {
+  const cp = ch.codePointAt(0);
+  return (cp >= 0x4e00 && cp <= 0x9fff) || (cp >= 0x3400 && cp <= 0x4dbf);
+}
+
+/**
+ * Build a card record whose state + interval put it in the requested
+ * mastery tier (per tierOf() in srs.js). reps=1 so it doesn't look
+ * pristine; introducedAt = now.
+ */
+function bulkCard(tier, now = Date.now()) {
+  const base = {
+    state: "review", step: 0, ease: 2.5,
+    reps: 1, lapses: 0,
+    interval: 0, due: now, introducedAt: now,
+  };
+  switch (tier) {
+    case "apprentice":
+      return { ...base, state: "learning", reps: 0, interval: 0, due: now };
+    case "guru":
+      return { ...base, interval: 14, due: now + 14 * DAY };
+    case "master":
+      return { ...base, interval: 60, due: now + 60 * DAY };
+    case "enlightened":
+      return { ...base, interval: 200, due: now + 200 * DAY };
+    case "burned":
+      return { ...base, interval: 400, due: now + 400 * DAY };
+    default:
+      return base;
+  }
+}
+
+function analyzeCatchupInput(text) {
+  const seen = new Set();
+  const result = { toAdd: [], alreadyKnown: [], unknown: [], duplicates: 0 };
+  for (const ch of text) {
+    if (!isKanjiChar(ch)) continue;
+    if (seen.has(ch)) { result.duplicates += 1; continue; }
+    seen.add(ch);
+    const k = kanjiByChar.get(ch);
+    if (!k) { result.unknown.push(ch); continue; }
+    if (state.cards[ch]) result.alreadyKnown.push(k);
+    else result.toAdd.push(k);
+  }
+  return result;
+}
+
+function renderCatchup() {
+  const wrap = document.createElement("section");
+  wrap.innerHTML = `
+    <div class="hero">
+      <h1>Quick catch-up</h1>
+      <p class="sub">Paste the kanji you already know, pick a tier, hit Apply.
+      Cards will be added at that mastery level so they don't get
+      reintroduced as new. Approximate, but quicker than starting over.</p>
+    </div>
+
+    <div class="field">
+      <h3>Mastery tier</h3>
+      <div class="opt-row" id="tier-row">
+        ${TIERS.map((t, i) => `
+          <button class="opt ${t === "guru" ? "selected" : ""}" data-tier="${t}">${t}</button>
+        `).join("")}
+      </div>
+      <p style="color:var(--text-dim); font-size:13px; margin:8px 0 0">
+        <strong>Apprentice</strong> = just learned, will review within minutes.
+        <strong>Guru</strong> = retained for a couple weeks (recommended default).
+        <strong>Master</strong> = 2 months. <strong>Enlightened</strong> = 6 months.
+        <strong>Burned</strong> = retired, won't reappear in reviews.
+      </p>
+    </div>
+
+    <div class="field">
+      <h3>Kanji</h3>
+      <textarea id="catchup-input" class="kanji-textarea"
+        placeholder="Paste or type: 山川火水…" rows="5"></textarea>
+      <div class="preview-info" id="preview">Type or paste kanji above.</div>
+    </div>
+
+    <div class="btn-row" style="justify-content:flex-end; gap:8px">
+      <button class="btn" data-go="settings">Cancel</button>
+      <button class="btn btn-primary" id="apply" disabled>Apply</button>
+    </div>
+  `;
+  els.view.appendChild(wrap);
+
+  let selectedTier = "guru";
+
+  const tierRow = wrap.querySelector("#tier-row");
+  tierRow.querySelectorAll("[data-tier]").forEach((b) =>
+    b.addEventListener("click", () => {
+      selectedTier = b.getAttribute("data-tier");
+      tierRow.querySelectorAll(".opt").forEach((x) => x.classList.remove("selected"));
+      b.classList.add("selected");
+      refreshPreview();
+    }),
+  );
+
+  const input = wrap.querySelector("#catchup-input");
+  const preview = wrap.querySelector("#preview");
+  const applyBtn = wrap.querySelector("#apply");
+
+  function refreshPreview() {
+    const text = input.value;
+    if (!text.trim()) {
+      preview.innerHTML = "Type or paste kanji above.";
+      applyBtn.disabled = true;
+      return;
+    }
+    const a = analyzeCatchupInput(text);
+    const sample = a.toAdd.slice(0, 16).map((k) => k.c).join(" ");
+    const sampleMore = a.toAdd.length > 16 ? ` <span style="color:var(--text-mute)">+${a.toAdd.length - 16} more</span>` : "";
+    preview.innerHTML = `
+      <div><span class="count">${a.toAdd.length}</span> new kanji to add as <strong>${selectedTier}</strong>.</div>
+      ${a.alreadyKnown.length > 0 ? `<div style="color:var(--text-mute); margin-top:4px"><span class="count">${a.alreadyKnown.length}</span> already in your queue — will be skipped.</div>` : ""}
+      ${a.unknown.length > 0 ? `<div style="color:var(--text-mute); margin-top:4px"><span class="count">${a.unknown.length}</span> not in the JLPT dataset — will be skipped.</div>` : ""}
+      ${a.duplicates > 0 ? `<div style="color:var(--text-mute); margin-top:4px"><span class="count">${a.duplicates}</span> duplicates in your input.</div>` : ""}
+      ${sample ? `<div class="catchup-sample">${sample}${sampleMore}</div>` : ""}
+    `;
+    applyBtn.disabled = a.toAdd.length === 0;
+  }
+
+  input.addEventListener("input", refreshPreview);
+
+  applyBtn.addEventListener("click", () => {
+    const a = analyzeCatchupInput(input.value);
+    if (a.toAdd.length === 0) return;
+    if (!confirm(`Add ${a.toAdd.length} kanji as ${selectedTier}?`)) return;
+    const now = Date.now();
+    for (const k of a.toAdd) {
+      state.cards[k.c] = bulkCard(selectedTier, now);
+    }
+    persist();
+    toast("good", `${a.toAdd.length} kanji added as ${selectedTier}`);
+    go({ name: "home" });
+  });
+
+  wrap.querySelectorAll("[data-go]").forEach((b) =>
+    b.addEventListener("click", () => go({ name: b.getAttribute("data-go") })),
+  );
 }
 
 // ---------- Empty state -----------------------------------------------------
