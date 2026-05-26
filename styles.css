@@ -759,6 +759,25 @@ button.tier-pill:hover { background: var(--bg-elev); }
   50%      { transform: translateY(-1.5px) scale(1.01); }
 }
 
+/* Irked — slight twitch, eyebrows say it all */
+.kaeru.kaeru-irked {
+  animation: kaeruIrked 2.4s ease-in-out infinite;
+}
+@keyframes kaeruIrked {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  45%      { transform: translateY(1px) rotate(-1deg); }
+  55%      { transform: translateY(1px) rotate(1deg); }
+}
+
+/* Angry — rapid shake */
+.kaeru.kaeru-angry {
+  animation: kaeruAngry 0.13s ease-in-out infinite;
+}
+@keyframes kaeruAngry {
+  0%, 100% { transform: translate(-1px, 0) rotate(-1deg) scale(1.04); }
+  50%      { transform: translate( 1px, 0) rotate(1deg)  scale(1.04); }
+}
+
 /* The character + speech-bubble scene */
 .kaeru-scene {
   display: flex;
@@ -816,6 +835,20 @@ button.tier-pill:hover { background: var(--bg-elev); }
   transform: translateX(-50%);
   filter: drop-shadow(0 -1px 0 var(--line));
 }
+
+/* Kaeru as quiz host — small character beside an inline speech bubble */
+.kaeru-asker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 6px;
+}
+.kaeru-asker .kaeru-bubble {
+  flex: 1;
+  font-size: 14px;
+  padding: 9px 12px;
+}
+.kaeru-asker .kaeru { filter: drop-shadow(0 3px 8px rgba(15, 23, 42, .12)); }
 
 /* Lore tagline */
 .lore-tagline {

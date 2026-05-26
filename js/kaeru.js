@@ -84,6 +84,40 @@ function eyesFor(mood) {
         <path d="M 70 25 Q 74 27 78 25" stroke="#1a1d24" stroke-width="1.4"
               fill="none" stroke-linecap="round"/>
       `;
+    case "irked":
+      // half-lowered lids + downward brow
+      return `
+        <path d="M 40 27 L 51 24" stroke="#7c2d12" stroke-width="1.6"
+              fill="none" stroke-linecap="round"/>
+        <path d="M 80 27 L 69 24" stroke="#7c2d12" stroke-width="1.6"
+              fill="none" stroke-linecap="round"/>
+        <circle cx="46" cy="30" r="2" fill="#1a1d24"/>
+        <circle cx="74" cy="30" r="2" fill="#1a1d24"/>
+        <path d="M 41 31 Q 46 33 51 31" stroke="#1a1d24" stroke-width="1.4"
+              fill="none" stroke-linecap="round"/>
+        <path d="M 69 31 Q 74 33 79 31" stroke="#1a1d24" stroke-width="1.4"
+              fill="none" stroke-linecap="round"/>
+      `;
+    case "angry":
+      // ">_<" furious eyes + steam puffs
+      return `
+        <path d="M 40 24 L 52 31" stroke="#7c2d12" stroke-width="2.2"
+              stroke-linecap="round"/>
+        <path d="M 80 24 L 68 31" stroke="#7c2d12" stroke-width="2.2"
+              stroke-linecap="round"/>
+        <path d="M 41 32 L 51 28" stroke="#1a1d24" stroke-width="1.6"
+              fill="none" stroke-linecap="round"/>
+        <path d="M 79 32 L 69 28" stroke="#1a1d24" stroke-width="1.6"
+              fill="none" stroke-linecap="round"/>
+        <circle cx="26" cy="22" r="3" fill="#fff" stroke="#94a3b8"
+                stroke-width="1" opacity="0.85"/>
+        <circle cx="22" cy="16" r="2" fill="#fff" stroke="#94a3b8"
+                stroke-width="1" opacity="0.7"/>
+        <circle cx="94" cy="22" r="3" fill="#fff" stroke="#94a3b8"
+                stroke-width="1" opacity="0.85"/>
+        <circle cx="98" cy="16" r="2" fill="#fff" stroke="#94a3b8"
+                stroke-width="1" opacity="0.7"/>
+      `;
     case "alert":
       return `
         <circle cx="46" cy="28" r="4.5" fill="#fff" stroke="#1a1d24" stroke-width="1.2"/>
@@ -125,6 +159,17 @@ function mouthFor(mood) {
       return `
         <path d="M 50 56 Q 60 50 70 56" stroke="#1a1d24" stroke-width="2"
               fill="none" stroke-linecap="round"/>
+      `;
+    case "irked":
+      return `
+        <path d="M 52 53 L 68 53" stroke="#1a1d24" stroke-width="2"
+              fill="none" stroke-linecap="round"/>
+      `;
+    case "angry":
+      return `
+        <path d="M 48 56 Q 60 48 72 56 L 70 58 Q 60 52 50 58 Z"
+              fill="#1a1d24" stroke="#1a1d24" stroke-width="1.6"
+              stroke-linejoin="round"/>
       `;
     case "alert":
       return `
@@ -168,13 +213,55 @@ const QUOTES = {
     "Stillness is also study.",
   ],
   learnDone: [
-    "{kanji} now sits at your table. Be a good host.",
-    "You've made room for {kanji}. Let it teach you slowly.",
-    "{kanji} arrived. Don't rush its name.",
+    "Ah, '{meaning}'. A worthy guest — don't feed it after midnight.",
+    "{kanji} — that's '{meaning}', for the uninitiated.",
+    "'{meaning}'? In this economy?",
+    "Knew a '{meaning}' once. Quiet type. Like {kanji}.",
+    "Behold: '{meaning}'. The cosmos files this under 'minor wisdom'.",
+    "I once forgot {kanji} and just called it 'thing'. Worked for a week.",
+    "{kanji}, '{meaning}'. May it serve you, or at least not bite.",
+    "Some kanji shout. {kanji} just hums '{meaning}' under its breath.",
+    "Old proverb: 'a {meaning} in the hand is worth two in the pond.' Made it up. Still true.",
+    "Welcome, '{meaning}'. Your roommate is {kanji}, who is — coincidentally — also '{meaning}'.",
+    "I asked my master what '{meaning}' truly is. He said: {kanji}. Helpful, that man.",
+    "Heavy with intent, light with strokes: '{meaning}'.",
+    "Pop quiz next week. The answer is {kanji}. Don't tell anyone.",
+    "{kanji} walked into a temple. The frog said: '{meaning}?' The kanji said: 'yes'.",
+    "Filed away in your skull's filing cabinet, top drawer: '{meaning}'.",
+    "A '{meaning}'-shaped door opens. Mind the lotus — it bites back.",
+    "Look at you, learning '{meaning}'. The pond is impressed.",
+    "Ribbiting news: '{meaning}' is now part of your kanji rolodex.",
+    "Some say {kanji} contains the spirit of '{meaning}'. Some say I talk too much. Both are true.",
+    "If you forget what {kanji} means, just remember: '{meaning}'. Or eat a fly. Both work.",
   ],
   learnDoneGeneric: [
     "Lanterns lit. The hall is brighter.",
     "New friends. Walk with them a while.",
+  ],
+  quizWrongMild: [
+    "Almost. {kanji} is '{correct}', not '{picked}'.",
+    "Close, but the brush wandered. {kanji} = '{correct}'.",
+    "Eh. {kanji} means '{correct}'. Try again next time.",
+    "Pond says no. {kanji} is '{correct}'.",
+  ],
+  quizWrongIrked: [
+    "That's the third one, by my count. {kanji} = '{correct}'.",
+    "Pay attention, student. {kanji} is '{correct}'.",
+    "The lotus sighs. {kanji} means '{correct}'.",
+    "Focus. {kanji} = '{correct}', as it has been since the Heian period.",
+  ],
+  quizWrongAngry: [
+    "ENOUGH. {kanji} is '{correct}'. Write it on your arm.",
+    "I am NOT angry. The pond is angry. {kanji} = '{correct}'.",
+    "{kanji} means '{correct}'. You will remember this or I will haunt your dreams.",
+    "RIBBIT. That means I'm displeased. {kanji} = '{correct}'.",
+  ],
+  quizRight: [
+    "Correct.",
+    "Yes — {kanji} indeed means '{correct}'.",
+    "The pond approves.",
+    "Bow accepted.",
+    "Mm. Good frog.",
   ],
   reviewSmall: [
     "A small bell still rings clear.",
@@ -240,6 +327,17 @@ export function speak(context, ctx = {}) {
     if (p === 100) { bucket = QUOTES.quizPerfect; mood = "happy"; }
     else if (p >= 70) { bucket = QUOTES.quizHigh; mood = "calm"; }
     else { bucket = QUOTES.quizLow; mood = "sad"; }
+  } else if (context === "quizRight") {
+    bucket = QUOTES.quizRight;
+    mood = "happy";
+  } else if (context === "quizWrong") {
+    const m = ctx.misses ?? 1;
+    if (m <= 2)       { bucket = QUOTES.quizWrongMild;  mood = "sad"; }
+    else if (m <= 5)  { bucket = QUOTES.quizWrongIrked; mood = "irked"; }
+    else              { bucket = QUOTES.quizWrongAngry; mood = "angry"; }
+  } else if (context === "quizAsk") {
+    bucket = ["What does this kanji mean?"];
+    mood = ctx.baseMood ?? "calm";
   }
 
   return { line: fill(pick(bucket), ctx), mood };

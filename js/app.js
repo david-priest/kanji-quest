@@ -433,7 +433,10 @@ function renderLearn() {
     // Reference one of the kanji you just learned in the dialogue.
     const featured = list[list.length - 1];
     e.innerHTML = `
-      ${kaeruScene("learnDone", { kanji: featured?.c }, "stack")}
+      ${kaeruScene("learnDone", {
+        kanji: featured?.c,
+        meaning: featured?.m?.[0] ?? "the meaning",
+      }, "stack")}
       <h2>Nice — those are queued</h2>
       <p>${remaining > 0
           ? `${remaining} N${state.settings.activeLevel} kanji still to introduce.`
@@ -687,6 +690,12 @@ function renderQuizRun() {
     const options = shuffle([correct, ...distractors]);
     let answered = false;
 
+    // Base mood reflects how grumpy Kaeru is at this point in the quiz.
+    const baseMood =
+      misses.length <= 2 ? "calm" :
+      misses.length <= 5 ? "irked" :
+      "angry";
+
     surface.innerHTML = `
       <div class="progress-line" style="width:${(idx / list.length) * 100}%"></div>
       <div class="card-meta">
@@ -694,7 +703,10 @@ function renderQuizRun() {
         <span>${idx + 1} / ${list.length} · ✓ ${correctCount}</span>
       </div>
       <div class="kanji-big">${k.c}</div>
-      <div class="mcq-prompt">What does this kanji mean?</div>
+      <div class="kaeru-asker" id="kaeru-host">
+        ${kaeruSvg(baseMood, 64)}
+        <div class="kaeru-bubble">What does this kanji mean?</div>
+      </div>
       <div class="mcq-options">
         ${options.map((opt) => `
           <button class="mcq-opt" data-opt="${escapeHtml(opt)}">${escapeHtml(opt)}</button>
@@ -703,6 +715,12 @@ function renderQuizRun() {
     `;
 
     const optBtns = [...surface.querySelectorAll(".mcq-opt")];
+
+    const updateKaeru = (mood, line) => {
+      const host = surface.querySelector("#kaeru-host");
+      if (!host) return;
+      host.innerHTML = `${kaeruSvg(mood, 64)}<div class="kaeru-bubble">${escapeHtml(line)}</div>`;
+    };
 
     const advance = () => {
       idx += 1;
@@ -723,13 +741,18 @@ function renderQuizRun() {
         if (v === correct) b.classList.add("correct");
         else if (b === btn) b.classList.add("wrong");
       });
-      toast(
-        isCorrect ? "good" : "bad",
-        isCorrect ? "Correct!" : `Nope — ${k.c} = ${correct}`,
-      );
+      if (isCorrect) {
+        const r = kaeruSpeak("quizRight", { kanji: k.c, correct });
+        updateKaeru(r.mood, r.line);
+      } else {
+        const r = kaeruSpeak("quizWrong", {
+          kanji: k.c, correct, picked, misses: misses.length,
+        });
+        updateKaeru(r.mood, r.line);
+      }
       // Auto-advance: snappier when correct, longer on wrong so the
-      // right answer is visible for a moment.
-      setTimeout(advance, isCorrect ? 600 : 1400);
+      // right answer (and Kaeru's reaction) stays visible.
+      setTimeout(advance, isCorrect ? 700 : 1800);
     };
     optBtns.forEach((b) => b.addEventListener("click", () => pickOption(b)));
 
