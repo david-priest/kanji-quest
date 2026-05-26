@@ -1,0 +1,24 @@
+{
+  "name": "kanji-quest",
+  "version": "1.0.0",
+  "description": "A self-contained, mobile-friendly JLPT kanji review app. No backend, no account — progress lives in your browser via `localStorage`.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/david-priest/kanji-quest.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/david-priest/kanji-quest/issues"
+  },
+  "homepage": "https://github.com/david-priest/kanji-quest#readme",
+  "dependencies": {
+    "kuromoji": "^0.1.2"
+  }
+}

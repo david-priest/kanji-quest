@@ -21,12 +21,17 @@ const els = {
 let state = loadState();
 let kanji = [];                 // [{c, n, s, f, m, on, kun, r}]
 let kanjiByChar = new Map();    // char -> entry
+let examples = {};              // { char: { tokens: [{t, r|null}, ...] } }
 let route = { name: "home" };
 
 (async function init() {
-  const res = await fetch("./data/jlpt-kanji.json");
-  kanji = await res.json();
+  const [kanjiRes, examplesRes] = await Promise.all([
+    fetch("./data/jlpt-kanji.json"),
+    fetch("./data/examples.json"),
+  ]);
+  kanji = await kanjiRes.json();
   kanjiByChar = new Map(kanji.map((k) => [k.c, k]));
+  try { examples = await examplesRes.json(); } catch { examples = {}; }
 
   els.navHome.addEventListener("click", () => go({ name: "home" }));
   els.navSettings.addEventListener("click", () => go({ name: "settings" }));
@@ -274,6 +279,7 @@ function renderLearn() {
           <em>${escapeHtml(k.m?.[0] ?? "the meaning")}</em>. The weirder the image,
           the stickier the memory.
         </div>`}
+        ${exampleHtml(k.c)}
       </div>
       <div class="btn-row" style="justify-content:flex-end; margin-top:auto">
         <button class="btn btn-ghost" data-act="skip">Skip</button>
@@ -435,6 +441,24 @@ function escapeHtml(s) {
 }
 function escapeAttr(s) { return escapeHtml(s); }
 
+/** Render the example sentence for a kanji as a ruby-annotated HTML block. */
+function exampleHtml(char) {
+  const ex = examples[char];
+  if (!ex || !ex.tokens?.length) return "";
+  const inner = ex.tokens.map((t) => {
+    if (t.r) {
+      return `<ruby>${escapeHtml(t.t)}<rt>${escapeHtml(t.r)}</rt></ruby>`;
+    }
+    return escapeHtml(t.t);
+  }).join("");
+  return `
+    <div class="example">
+      <div class="ex-label">Example</div>
+      <div class="ex-jp">${inner}</div>
+    </div>
+  `;
+}
+
 // ---------- Review ----------------------------------------------------------
 
 function renderReview() {
@@ -503,6 +527,7 @@ function renderReview() {
           <div class="row"><span class="label">Kun-yomi</span>
             <span class="vals jp">${(k.kun ?? []).join(" · ") || "—"}</span></div>
         </div>
+        ${exampleHtml(k.c)}
         <div class="grade-row">
           <button class="grade grade-again" data-g="again">Again<span class="iv">${ivLabel(card, "again")}</span></button>
           <button class="grade grade-hard"  data-g="hard">Hard<span class="iv">${ivLabel(card, "hard")}</span></button>
@@ -684,6 +709,7 @@ function showKanjiDetail(k) {
         ${k.f ? `<div class="row"><span class="label">Frequency</span><span class="vals">#${k.f}</span></div>` : ""}
         ${card ? `<div class="row"><span class="label">Reps</span><span class="vals">${card.reps} · ${card.lapses} lapse${card.lapses === 1 ? "" : "s"}</span></div>` : ""}
       </div>
+      ${exampleHtml(k.c)}
     </div>
   `;
   document.body.appendChild(dlg);

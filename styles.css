@@ -338,6 +338,33 @@ button.tier-pill:hover { background: var(--bg-elev); }
 }
 .mnemonic em { color: var(--text); font-style: normal; font-weight: 700; }
 
+/* ===== Example sentence ======================================== */
+.example {
+  border-left: 3px solid var(--blue);
+  background: rgba(37, 99, 235, .05);
+  padding: 10px 14px 12px;
+  border-radius: 8px;
+  margin-top: 6px;
+}
+.ex-label {
+  font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-mute); font-weight: 700;
+  margin-bottom: 4px;
+}
+.ex-jp {
+  font-family: var(--font-jp);
+  font-size: 20px;
+  line-height: 2.2;
+  color: var(--text);
+}
+.ex-jp ruby rt {
+  font-size: 11px;
+  color: var(--blue);
+  font-weight: 500;
+  letter-spacing: 0;
+  font-family: var(--font-jp);
+}
+
 /* ===== Done / empty states ===================================== */
 .empty {
   text-align: center; padding: 32px 16px;
