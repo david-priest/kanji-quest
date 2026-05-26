@@ -722,10 +722,15 @@ function showKanjiDetail(k) {
   const card = state.cards[k.c];
   const tier = card ? tierOf(card) : "unseen";
   const isLeech = card && card.lapses >= 8;
+  const canBurn = tier !== "burned";
+  const canRemove = card != null;
   const dlg = document.createElement("div");
   dlg.className = "modal-backdrop";
+  dlg.setAttribute("role", "dialog");
+  dlg.setAttribute("aria-modal", "true");
+  dlg.setAttribute("aria-label", `Details for kanji ${k.c}`);
   dlg.innerHTML = `
-    <div class="modal">
+    <div class="modal" tabindex="-1">
       <button class="modal-close" aria-label="Close">×</button>
       <div class="modal-k">${k.c}</div>
       <div class="modal-tier tier-${tier}">${tier}${isLeech ? ' <span class="leech-badge" title="Many lapses — consider revisiting the mnemonic">leech</span>' : ""}</div>
@@ -741,12 +746,63 @@ function showKanjiDetail(k) {
         ${card ? `<div class="row"><span class="label">Reps</span><span class="vals">${card.reps} · ${card.lapses} lapse${card.lapses === 1 ? "" : "s"}</span></div>` : ""}
       </div>
       ${exampleHtml(k.c)}
+      <div class="modal-actions">
+        ${canBurn ? `<button class="btn btn-ghost" data-act="burn">Mark as known (burn)</button>` : ""}
+        ${canRemove ? `<button class="btn btn-ghost danger-text" data-act="remove">Remove from queue</button>` : ""}
+      </div>
     </div>
   `;
   document.body.appendChild(dlg);
-  const close = () => dlg.remove();
+
+  // Focus management for a11y: remember the previously focused element,
+  // move focus into the modal, restore it on close.
+  const previouslyFocused = document.activeElement;
+  const modalEl = dlg.querySelector(".modal");
+  modalEl.focus();
+
+  const close = () => {
+    document.removeEventListener("keydown", onKey);
+    dlg.remove();
+    if (previouslyFocused && typeof previouslyFocused.focus === "function") {
+      previouslyFocused.focus();
+    }
+  };
+  function onKey(e) {
+    if (e.key === "Escape") { e.preventDefault(); close(); }
+  }
+  document.addEventListener("keydown", onKey);
+
   dlg.addEventListener("click", (e) => { if (e.target === dlg) close(); });
   dlg.querySelector(".modal-close").addEventListener("click", close);
+
+  const burnBtn = dlg.querySelector('[data-act="burn"]');
+  if (burnBtn) burnBtn.addEventListener("click", () => {
+    if (!confirm(`Mark ${k.c} as burned? It won't appear in reviews again.`)) return;
+    // Set the card into a "burned" state: review-state with a 1-year interval.
+    const now = Date.now();
+    state.cards[k.c] = {
+      state: "review",
+      step: 0,
+      ease: 2.5,
+      interval: 400,           // ≥ 365 → tierOf returns 'burned'
+      reps: (card?.reps ?? 0) + 1,
+      lapses: card?.lapses ?? 0,
+      due: now + 400 * 24 * 60 * 60 * 1000,
+      introducedAt: card?.introducedAt ?? now,
+    };
+    persist();
+    toast("tier", `${k.c} → burned`);
+    close();
+  });
+
+  const rmBtn = dlg.querySelector('[data-act="remove"]');
+  if (rmBtn) rmBtn.addEventListener("click", () => {
+    if (!confirm(`Remove ${k.c} from your queue? Progress on it will be lost.`)) return;
+    delete state.cards[k.c];
+    persist();
+    toast("bad", `${k.c} removed`);
+    close();
+  });
 }
 
 // ---------- Mastery overview ------------------------------------------------
