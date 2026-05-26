@@ -8,7 +8,7 @@
 // breaking update to any precached file — that triggers the new SW to
 // clean out old caches on activate.
 
-const CACHE_VERSION = "v5";
+const CACHE_VERSION = "v6";
 const APP_CACHE = `kanji-quest-app-${CACHE_VERSION}`;
 const DATA_CACHE = `kanji-quest-data-${CACHE_VERSION}`;
 
@@ -20,6 +20,7 @@ const APP_SHELL = [
   "./js/srs.js",
   "./js/gamification.js",
   "./js/storage.js",
+  "./js/kaeru.js",
   "./icon.svg",
   "./manifest.webmanifest",
 ];

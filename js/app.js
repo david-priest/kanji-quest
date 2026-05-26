@@ -3,6 +3,7 @@
 import { loadState, saveState, resetState, exportState, importState } from "./storage.js";
 import { newCard, grade as applyGrade, tierOf, isDue, TIERS, DAY } from "./srs.js";
 import { awardForGrade, rollCrit, todayKey, levelFromXp } from "./gamification.js";
+import { kaeruSvg, speak as kaeruSpeak } from "./kaeru.js";
 
 // ---------- Boot ------------------------------------------------------------
 
@@ -182,6 +183,11 @@ function renderHome() {
   `;
   els.view.appendChild(hero);
 
+  // Master Kaeru, sitting between the hero and your stats.
+  const kaeru = document.createElement("div");
+  kaeru.innerHTML = kaeruScene("greeting", { streak: state.streak.current });
+  els.view.appendChild(kaeru.firstElementChild);
+
   // Mastery row
   const mastery = aggregateMastery();
   const masteryHead = document.createElement("div");
@@ -241,6 +247,11 @@ function renderHome() {
   if (expanded != null) {
     renderInlineLevelDetail(expanded);
   }
+
+  const lore = document.createElement("p");
+  lore.className = "lore-tagline";
+  lore.textContent = "— Temple of Ten Thousand Kanji —";
+  els.view.appendChild(lore);
 
   els.view.querySelectorAll("[data-go]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -419,8 +430,10 @@ function renderLearn() {
     const nextChunk = Math.min(chunk, remaining);
     const e = document.createElement("section");
     e.className = "empty";
+    // Reference one of the kanji you just learned in the dialogue.
+    const featured = list[list.length - 1];
     e.innerHTML = `
-      <div class="emoji">🎉</div>
+      ${kaeruScene("learnDone", { kanji: featured?.c }, "stack")}
       <h2>Nice — those are queued</h2>
       <p>${remaining > 0
           ? `${remaining} N${state.settings.activeLevel} kanji still to introduce.`
@@ -487,6 +500,25 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+/**
+ * Render Master Kaeru with a speech bubble.
+ *   context: matches kaeru.js QUOTES key (greeting, learnDone, ...)
+ *   ctx:     vars referenced by the quote ({kanji}, {streak}, {pct}, ...)
+ *   layout:  "side" (default — horizontal, for inline/home use) or
+ *            "stack" (vertical, centered — for done/empty screens)
+ */
+function kaeruScene(context, ctx = {}, layout = "side") {
+  const { line, mood } = kaeruSpeak(context, ctx);
+  const cls = layout === "stack" ? "kaeru-scene stack" : "kaeru-scene";
+  const size = layout === "stack" ? 130 : 88;
+  return `
+    <div class="${cls}">
+      ${kaeruSvg(mood, size)}
+      <div class="kaeru-bubble">${escapeHtml(line)}</div>
+    </div>
+  `;
 }
 
 /** Render the example sentence for a kanji as a ruby-annotated HTML block. */
@@ -720,7 +752,7 @@ function renderQuizRun() {
     const e = document.createElement("section");
     e.className = "empty";
     e.innerHTML = `
-      <div class="emoji">${pct === 100 ? "🏅" : pct >= 80 ? "💪" : pct >= 50 ? "📚" : "🌱"}</div>
+      ${kaeruScene("quizDone", { pct }, "stack")}
       <h2>Quiz complete</h2>
       <p>${correctCount} of ${list.length} correct (${pct}%)</p>
       <div class="summary">
@@ -765,7 +797,7 @@ function renderQuizRun() {
 function renderReview() {
   let queue = dueCards();
   if (queue.length === 0) {
-    showEmpty("✨", "All caught up", "No reviews are due right now. Learn some new kanji, or come back later.");
+    showEmptyWithKaeru("emptyReviews", "All caught up", "No reviews are due right now. Learn some new kanji, or come back later.");
     return;
   }
 
@@ -894,7 +926,7 @@ function renderReview() {
     const e = document.createElement("section");
     e.className = "empty";
     e.innerHTML = `
-      <div class="emoji">📚</div>
+      ${kaeruScene("reviewDone", { count: session.answered }, "stack")}
       <h2>Session complete</h2>
       <p>${session.answered} reviewed in ${formatDuration(secs)}</p>
       <div class="summary">
@@ -1285,6 +1317,23 @@ function renderSettings() {
 }
 
 // ---------- Empty state -----------------------------------------------------
+
+function showEmptyWithKaeru(context, title, body) {
+  const e = document.createElement("section");
+  e.className = "empty";
+  e.innerHTML = `
+    ${kaeruScene(context, {}, "stack")}
+    <h2>${title}</h2>
+    <p>${body}</p>
+    <div class="btn-row" style="justify-content:center">
+      <button class="btn" data-go="home">Home</button>
+    </div>
+  `;
+  els.view.appendChild(e);
+  e.querySelectorAll("[data-go]").forEach((b) =>
+    b.addEventListener("click", () => go({ name: b.getAttribute("data-go") })),
+  );
+}
 
 function showEmpty(emoji, title, body) {
   const e = document.createElement("section");

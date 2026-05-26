@@ -707,3 +707,123 @@ button.tier-pill:hover { background: var(--bg-elev); }
   border-color: transparent;
 }
 .kanji-search::placeholder { color: var(--text-mute); }
+
+/* ===== Master Kaeru ============================================ */
+.kaeru {
+  display: block;
+  transform-origin: 50% 100%;
+  animation: kaeruBreathe 3.6s ease-in-out infinite;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 12px rgba(15, 23, 42, .12));
+}
+@keyframes kaeruBreathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-3px) scale(1.02); }
+}
+
+/* Happy bounce — overrides breathing while showing reaction */
+.kaeru.kaeru-happy {
+  animation: kaeruHappy 1.6s ease-in-out infinite;
+}
+@keyframes kaeruHappy {
+  0%, 100% { transform: translateY(0) rotate(-2deg) scale(1); }
+  25%      { transform: translateY(-8px) rotate(2deg) scale(1.04); }
+  50%      { transform: translateY(0) rotate(-1deg) scale(1); }
+  75%      { transform: translateY(-4px) rotate(2deg) scale(1.03); }
+}
+
+/* Sad slumps slowly */
+.kaeru.kaeru-sad {
+  animation: kaeruSad 4.2s ease-in-out infinite;
+}
+@keyframes kaeruSad {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(2px) scale(0.99); }
+}
+
+/* Alert / startled jolt */
+.kaeru.kaeru-alert {
+  animation: kaeruAlert 0.45s ease-out infinite alternate;
+}
+@keyframes kaeruAlert {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(-6px); }
+}
+
+/* Sleep — almost still, tiny rise */
+.kaeru.kaeru-sleep {
+  animation: kaeruSleep 5s ease-in-out infinite;
+}
+@keyframes kaeruSleep {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-1.5px) scale(1.01); }
+}
+
+/* The character + speech-bubble scene */
+.kaeru-scene {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background: linear-gradient(160deg, #ffffff, #f7f9ff);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+.kaeru-scene.stack {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  margin-bottom: 8px;
+}
+.kaeru-bubble {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.kaeru-bubble::before {
+  content: "";
+  position: absolute;
+  left: -9px; top: 18px;
+  width: 0; height: 0;
+  border: 9px solid transparent;
+  border-right-color: var(--bg-elev-2);
+  border-left: 0;
+  filter: drop-shadow(-1px 0 0 var(--line));
+}
+.kaeru-scene.stack .kaeru-bubble {
+  max-width: 360px;
+  margin-top: 8px;
+}
+.kaeru-scene.stack .kaeru-bubble::before {
+  left: 50%; top: -9px;
+  border: 9px solid transparent;
+  border-bottom-color: var(--bg-elev-2);
+  border-top: 0;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 -1px 0 var(--line));
+}
+
+/* Lore tagline */
+.lore-tagline {
+  text-align: center;
+  margin: 36px 0 4px;
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  font-style: italic;
+}
