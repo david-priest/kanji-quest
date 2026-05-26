@@ -26,13 +26,20 @@ let route = { name: "home" };
 let viewCleanup = null;         // global teardown for whichever view is mounted
 
 (async function init() {
-  const [kanjiRes, examplesRes] = await Promise.all([
-    fetch("./data/jlpt-kanji.json"),
-    fetch("./data/examples.json"),
-  ]);
+  const kanjiRes = await fetch("./data/jlpt-kanji.json");
   kanji = await kanjiRes.json();
   kanjiByChar = new Map(kanji.map((k) => [k.c, k]));
-  try { examples = await examplesRes.json(); } catch { examples = {}; }
+
+  // examples.json is ~440KB and only needed in Learn / Review / detail
+  // modal. Load it in the background; if a view that uses it is open
+  // when the load finishes, re-render so the sections appear.
+  fetch("./data/examples.json")
+    .then((r) => r.json())
+    .then((j) => {
+      examples = j;
+      if (route.name === "learn" || route.name === "review") render();
+    })
+    .catch(() => { examples = {}; });
 
   els.navHome.addEventListener("click", () => go({ name: "home" }));
   els.navSettings.addEventListener("click", () => go({ name: "settings" }));
