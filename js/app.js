@@ -23,6 +23,7 @@ let kanji = [];                 // [{c, n, s, f, m, on, kun, r}]
 let kanjiByChar = new Map();    // char -> entry
 let examples = {};              // { char: { tokens: [{t, r|null}, ...] } }
 let route = { name: "home" };
+let viewCleanup = null;         // global teardown for whichever view is mounted
 
 (async function init() {
   const [kanjiRes, examplesRes] = await Promise.all([
@@ -41,6 +42,7 @@ let route = { name: "home" };
 })();
 
 function go(next) {
+  if (viewCleanup) { viewCleanup(); viewCleanup = null; }
   route = next;
   render();
 }
@@ -321,7 +323,7 @@ function renderLearn() {
       <div class="mcq-prompt">What does this kanji mean?</div>
       <div class="mcq-options">
         ${options.map((opt) => `
-          <button class="mcq-opt" data-opt="${escapeAttr(opt)}">${escapeHtml(opt)}</button>
+          <button class="mcq-opt" data-opt="${escapeHtml(opt)}">${escapeHtml(opt)}</button>
         `).join("")}
       </div>
       <div class="btn-row" style="justify-content:space-between; margin-top:auto">
@@ -334,7 +336,7 @@ function renderLearn() {
       renderIntro();
     });
     const nextBtn = surface.querySelector('[data-act="next"]');
-    nextBtn.addEventListener("click", () => commitAndAdvance());
+    nextBtn.addEventListener("click", advance);
 
     surface.querySelectorAll(".mcq-opt").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -355,11 +357,6 @@ function renderLearn() {
         nextBtn.focus();
       });
     });
-  }
-
-  function commitAndAdvance() {
-    // Card was already queued when the user tapped "Quiz me →".
-    advance();
   }
 
   function advance() {
@@ -444,7 +441,6 @@ function escapeHtml(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
 }
-function escapeAttr(s) { return escapeHtml(s); }
 
 /** Render the example sentence for a kanji as a ruby-annotated HTML block. */
 function exampleHtml(char) {
@@ -484,7 +480,6 @@ function renderReview() {
     combo: 0,
     crit: rollCrit(),
     answered: 0,
-    correct: 0,
     again: 0,
     xpStart: state.xp.total,
     started: Date.now(),
@@ -499,8 +494,10 @@ function renderReview() {
     if (queue.length === 0) return showReviewDone();
     const { char, card, k } = queue[0];
     revealed = false;
+    const total = session.answered + queue.length;
+    const pct = total > 0 ? (session.answered / total) * 100 : 0;
     surface.innerHTML = `
-      <div class="progress-line" style="width:${(session.answered/(session.answered + queue.length))*100}%"></div>
+      <div class="progress-line" style="width:${pct}%"></div>
       <div class="card-meta">
         <span>Review · N${k.n} · ${tierOf(card)}</span>
         <span>
@@ -513,7 +510,10 @@ function renderReview() {
       <div class="tap-hint" id="tap-hint">Tap the kanji (or press space) to reveal</div>
     `;
     surface.querySelector("[data-k]").addEventListener("click", reveal);
+    // Replace any prior card's listener
+    if (viewCleanup) viewCleanup();
     document.addEventListener("keydown", onKey);
+    viewCleanup = () => document.removeEventListener("keydown", onKey);
     function onKey(e) {
       if (!revealed && (e.code === "Space" || e.code === "Enter")) { e.preventDefault(); reveal(); }
       else if (revealed) {
@@ -523,7 +523,6 @@ function renderReview() {
         else if (e.code === "Digit4") grade("easy");
       }
     }
-    surface._cleanup = () => document.removeEventListener("keydown", onKey);
 
     function reveal() {
       if (revealed) return;
@@ -553,7 +552,7 @@ function renderReview() {
     }
 
     function grade(action) {
-      surface._cleanup?.();
+      if (viewCleanup) { viewCleanup(); viewCleanup = null; }
       const before = state.cards[char];
       const tierBefore = tierOf(before);
       const updated = applyGrade(before, action);
@@ -562,8 +561,7 @@ function renderReview() {
 
       const award = awardForGrade(state, action, session);
       session.answered += 1;
-      if (action !== "again") session.correct += 1;
-      else session.again += 1;
+      if (action === "again") session.again += 1;
 
       state.stats.reviewedTotal += 1;
       if (tierBefore === "apprentice" && tierAfter !== "apprentice") {
@@ -596,7 +594,7 @@ function renderReview() {
   }
 
   function showReviewDone() {
-    surface._cleanup?.();
+    if (viewCleanup) { viewCleanup(); viewCleanup = null; }
     const xpEarned = state.xp.total - session.xpStart;
     const secs = Math.max(1, Math.round((Date.now() - session.started) / 1000));
     els.view.innerHTML = "";
