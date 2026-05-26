@@ -456,10 +456,17 @@ function exampleHtml(char) {
     }
     return escapeHtml(t.t);
   }).join("");
+  const en = ex.en
+    ? `<details class="ex-translation">
+         <summary>Show translation</summary>
+         <div class="ex-en">${escapeHtml(ex.en)}</div>
+       </details>`
+    : "";
   return `
     <div class="example">
       <div class="ex-label">Example</div>
       <div class="ex-jp">${inner}</div>
+      ${en}
     </div>
   `;
 }

@@ -364,6 +364,40 @@ button.tier-pill:hover { background: var(--bg-elev); }
   letter-spacing: 0;
   font-family: var(--font-jp);
 }
+.ex-translation {
+  margin-top: 8px;
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+}
+.ex-translation > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  letter-spacing: .3px;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.ex-translation > summary::-webkit-details-marker { display: none; }
+.ex-translation > summary::before {
+  content: "▸";
+  font-size: 10px;
+  transition: transform .12s ease;
+  display: inline-block;
+}
+.ex-translation[open] > summary::before { transform: rotate(90deg); }
+.ex-translation[open] > summary { color: var(--text-mute); }
+.ex-translation[open] > summary::after { content: " (hide)"; opacity: .7; }
+.ex-en {
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
 
 /* ===== Done / empty states ===================================== */
 .empty {
