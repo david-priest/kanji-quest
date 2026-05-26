@@ -282,21 +282,26 @@ function renderLearn() {
         ${exampleHtml(k.c)}
       </div>
       <div class="btn-row" style="justify-content:flex-end; margin-top:auto">
-        <button class="btn btn-ghost" data-act="skip">Skip</button>
+        <button class="btn btn-ghost" data-act="skip">Skip quiz →</button>
         <button class="btn btn-success" data-act="quiz">Quiz me →</button>
       </div>
     `;
-    surface.querySelector('[data-act="quiz"]').addEventListener("click", () => {
-      // Queue the card now, before the MCQ — so leaving mid-quiz doesn't lose it.
+    const queueCurrent = () => {
       const k = list[idx];
       if (!state.cards[k.c]) {
         state.cards[k.c] = newCard();
         persist();
       }
+    };
+    surface.querySelector('[data-act="quiz"]').addEventListener("click", () => {
+      queueCurrent();
       phase = "mcq";
       renderMcq();
     });
-    surface.querySelector('[data-act="skip"]').addEventListener("click", advance);
+    surface.querySelector('[data-act="skip"]').addEventListener("click", () => {
+      queueCurrent();
+      advance();
+    });
   }
 
   function renderMcq() {
