@@ -227,8 +227,9 @@ function aggregateMastery() {
 // ---------- Learn (intro + MCQ check) ---------------------------------------
 
 function renderLearn() {
-  const list = unseenInLevel();
-  if (list.length === 0) {
+  const chunk = Math.max(1, state.settings.dailyNewCap ?? 5);
+  const fullList = unseenInLevel();
+  if (fullList.length === 0) {
     showEmpty(
       "🌱",
       "No new cards available",
@@ -236,6 +237,7 @@ function renderLearn() {
     );
     return;
   }
+  const list = fullList.slice(0, chunk);
 
   let idx = 0;
   let phase = "intro"; // "intro" → "mcq" → next
@@ -265,9 +267,13 @@ function renderLearn() {
         <div class="row"><span class="label">Kun-yomi</span>
           <span class="vals jp">${(k.kun ?? []).join(" · ") || "—"}</span></div>
         ${k.r?.length ? `<div class="mnemonic">
-          Build a mental picture of <em>${(k.m?.[0] ?? "this")}</em> using its parts:
-          <em>${k.r.join(", ")}</em>. The weirder, the stickier.
-        </div>` : ""}
+          Build a mental picture of <em>${escapeHtml(k.m?.[0] ?? "this")}</em> using its parts:
+          <em>${escapeHtml(k.r.join(", "))}</em>. The weirder, the stickier.
+        </div>` : `<div class="mnemonic">
+          Picture a vivid, exaggerated scene that captures
+          <em>${escapeHtml(k.m?.[0] ?? "the meaning")}</em>. The weirder the image,
+          the stickier the memory.
+        </div>`}
       </div>
       <div class="btn-row" style="justify-content:flex-end; margin-top:auto">
         <button class="btn btn-ghost" data-act="skip">Skip</button>
@@ -275,6 +281,12 @@ function renderLearn() {
       </div>
     `;
     surface.querySelector('[data-act="quiz"]').addEventListener("click", () => {
+      // Queue the card now, before the MCQ — so leaving mid-quiz doesn't lose it.
+      const k = list[idx];
+      if (!state.cards[k.c]) {
+        state.cards[k.c] = newCard();
+        persist();
+      }
       phase = "mcq";
       renderMcq();
     });
@@ -335,11 +347,7 @@ function renderLearn() {
   }
 
   function commitAndAdvance() {
-    const k = list[idx];
-    if (!state.cards[k.c]) {
-      state.cards[k.c] = newCard();
-      persist();
-    }
+    // Card was already queued when the user tapped "Quiz me →".
     advance();
   }
 
@@ -355,21 +363,28 @@ function renderLearn() {
 
   function showLearnDone() {
     els.view.innerHTML = "";
+    const remaining = unseenInLevel().length;
+    const nextChunk = Math.min(chunk, remaining);
     const e = document.createElement("section");
     e.className = "empty";
     e.innerHTML = `
       <div class="emoji">🎉</div>
       <h2>Nice — those are queued</h2>
-      <p>They'll start appearing in your reviews within a minute.</p>
+      <p>${remaining > 0
+          ? `${remaining} N${state.settings.activeLevel} kanji still to introduce.`
+          : `All N${state.settings.activeLevel} kanji have been introduced.`}</p>
       <div class="btn-row" style="justify-content:center">
         <button class="btn" data-go="home">Home</button>
-        <button class="btn btn-primary" data-go="review">Start reviewing</button>
+        <button class="btn" data-go="review">Review</button>
+        ${remaining > 0 ? `<button class="btn btn-primary" data-act="more">Learn ${nextChunk} more →</button>` : ""}
       </div>
     `;
     els.view.appendChild(e);
     e.querySelectorAll("[data-go]").forEach((b) =>
       b.addEventListener("click", () => go({ name: b.getAttribute("data-go") })),
     );
+    const more = e.querySelector('[data-act="more"]');
+    if (more) more.addEventListener("click", () => go({ name: "learn" }));
     burst(40);
   }
 
@@ -752,6 +767,18 @@ function renderSettings() {
     </div>
 
     <div class="field">
+      <h3>Cards per learn session</h3>
+      <div class="field-row">
+        <input type="range" min="1" max="20" value="${state.settings.dailyNewCap ?? 5}" id="cap" />
+        <strong id="cap-val">${state.settings.dailyNewCap ?? 5}</strong>
+      </div>
+      <p style="color:var(--text-dim); font-size:13px; margin:8px 0 0">
+        How many new kanji are introduced per Learn session. No daily limit —
+        finish a session and tap "Learn more" to keep going.
+      </p>
+    </div>
+
+    <div class="field">
       <h3>Backup</h3>
       <div class="btn-row">
         <button class="btn" id="export">Export progress (JSON)</button>
@@ -781,6 +808,13 @@ function renderSettings() {
       persist(); renderSettings();
     }),
   );
+
+  const cap = wrap.querySelector("#cap");
+  const capVal = wrap.querySelector("#cap-val");
+  cap.addEventListener("input", () => { capVal.textContent = cap.value; });
+  cap.addEventListener("change", () => {
+    state.settings.dailyNewCap = Number(cap.value); persist();
+  });
 
   wrap.querySelector("#export").addEventListener("click", () => {
     const blob = new Blob([exportState()], { type: "application/json" });
