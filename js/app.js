@@ -96,7 +96,6 @@ function render() {
     case "learn":    return renderLearn();
     case "review":   return renderReview();
     case "settings": return renderSettings();
-    case "level":    return renderLevelDetail(route.level);
     case "mastery":  return renderMastery();
   }
 }
@@ -165,21 +164,44 @@ function renderHome() {
   lvlTitle.textContent = "JLPT levels — tap to browse";
   els.view.appendChild(lvlTitle);
 
+  const expanded = route.expanded ?? null;
   const grid = document.createElement("div");
   grid.className = "level-grid";
   for (const n of [5, 4, 3, 2, 1]) {
     const s = levelStats(n);
     const card = document.createElement("button");
-    card.className = "level-card" + (state.settings.activeLevel === n ? " active" : "");
+    const isOpen = expanded === n;
+    card.className =
+      "level-card" +
+      (state.settings.activeLevel === n ? " active" : "") +
+      (isOpen ? " open" : "");
     card.innerHTML = `
-      <div class="name">N${n}</div>
+      <div class="name">N${n}<span class="chev">${isOpen ? "▾" : "▸"}</span></div>
       <div class="meta">${s.masteredOrBetter}/${s.total} mastered</div>
       <div class="bar"><span style="width:${Math.round(s.pct*100)}%"></span></div>
     `;
-    card.addEventListener("click", () => go({ name: "level", level: n }));
+    card.addEventListener("click", () => {
+      if (route.expanded === n) {
+        go({ name: "home", expanded: null });
+      } else {
+        state.settings.activeLevel = n;
+        saveState(state);
+        renderTopbar();
+        go({ name: "home", expanded: n });
+        // Scroll to the inline detail after render
+        requestAnimationFrame(() => {
+          const detail = els.view.querySelector(".inline-level-detail");
+          if (detail) detail.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+    });
     grid.appendChild(card);
   }
   els.view.appendChild(grid);
+
+  if (expanded != null) {
+    renderInlineLevelDetail(expanded);
+  }
 
   els.view.querySelectorAll("[data-go]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -583,24 +605,21 @@ function formatDuration(s) {
   return `${m}m ${r.toString().padStart(2, "0")}s`;
 }
 
-// ---------- Level detail ----------------------------------------------------
+// ---------- Inline level detail (expanded under home grid) ------------------
 
-function renderLevelDetail(level) {
+function renderInlineLevelDetail(level) {
   const list = kanji.filter((k) => k.n === level);
   const s = levelStats(level);
-  const isActive = state.settings.activeLevel === level;
 
-  const head = document.createElement("section");
-  head.className = "detail-head";
-  head.innerHTML = `
+  const wrap = document.createElement("section");
+  wrap.className = "inline-level-detail";
+  wrap.innerHTML = `
     <div class="detail-head-row">
       <div>
         <div class="detail-title">N${level}</div>
-        <div class="detail-sub">${list.length} kanji · ${s.masteredOrBetter} mastered</div>
+        <div class="detail-sub">${list.length} kanji · ${s.masteredOrBetter} mastered · active level</div>
       </div>
-      <button class="btn ${isActive ? "" : "btn-primary"}" id="set-active" ${isActive ? "disabled" : ""}>
-        ${isActive ? "Active level" : "Set as active"}
-      </button>
+      <button class="btn btn-ghost" id="collapse">Collapse ▴</button>
     </div>
     <div class="legend">
       <span class="legend-item"><i class="dot unseen"></i>unseen ${s.tally.unseen}</span>
@@ -611,12 +630,10 @@ function renderLevelDetail(level) {
       <span class="legend-item"><i class="dot tier-burned"></i>burned ${s.tally.burned}</span>
     </div>
   `;
-  els.view.appendChild(head);
-  head.querySelector("#set-active").addEventListener("click", () => {
-    state.settings.activeLevel = level;
-    persist();
-    render();
-  });
+  els.view.appendChild(wrap);
+  wrap.querySelector("#collapse").addEventListener("click", () =>
+    go({ name: "home", expanded: null }),
+  );
 
   const grid = document.createElement("section");
   grid.className = "kanji-grid";
