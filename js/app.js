@@ -62,18 +62,6 @@ function unseenInLevel() {
   return activeLevelKanji().filter((k) => !state.cards[k.c]);
 }
 
-function newCardsIntroducedToday() {
-  const t = todayKey();
-  return Object.values(state.cards).filter((c) => {
-    const d = new Date(c.introducedAt);
-    return d.toLocaleDateString("en-CA") === t;
-  }).length;
-}
-
-function remainingDailyCap() {
-  return Math.max(0, state.settings.dailyNewCap - newCardsIntroducedToday());
-}
-
 function dueCards(now = Date.now()) {
   const out = [];
   for (const [char, card] of Object.entries(state.cards)) {
@@ -82,7 +70,6 @@ function dueCards(now = Date.now()) {
       if (k) out.push({ char, card, k });
     }
   }
-  // Due first (oldest overdue first), then learning vs review interleaved.
   out.sort((a, b) => a.card.due - b.card.due);
   return out;
 }
@@ -109,6 +96,8 @@ function render() {
     case "learn":    return renderLearn();
     case "review":   return renderReview();
     case "settings": return renderSettings();
+    case "level":    return renderLevelDetail(route.level);
+    case "mastery":  return renderMastery();
   }
 }
 
@@ -116,8 +105,7 @@ function render() {
 
 function renderHome() {
   const due = dueCards().length;
-  const remaining = remainingDailyCap();
-  const newAvail = Math.min(remaining, unseenInLevel().length);
+  const newAvail = unseenInLevel().length;
   const lvl = levelFromXp(state.xp.total);
 
   const greeting = greet();
@@ -141,10 +129,8 @@ function renderHome() {
           <div class="label">Learn new</div>
           <div class="sub">${
             newAvail === 0
-              ? remaining === 0
-                ? "Daily cap reached — try tomorrow"
-                : `All N${state.settings.activeLevel} introduced`
-              : `${remaining} left today`
+              ? `All N${state.settings.activeLevel} introduced`
+              : `N${state.settings.activeLevel}`
           }</div>
         </div>
         <div class="count">${newAvail}</div>
@@ -155,16 +141,20 @@ function renderHome() {
 
   // Mastery row
   const mastery = aggregateMastery();
-  const masteryEl = document.createElement("div");
-  masteryEl.className = "section-title";
-  masteryEl.textContent = "Your mastery";
-  els.view.appendChild(masteryEl);
+  const masteryHead = document.createElement("div");
+  masteryHead.className = "section-title section-title-row";
+  masteryHead.innerHTML = `
+    <span>Your mastery</span>
+    <button class="link-btn" data-go="mastery">See all kanji →</button>
+  `;
+  els.view.appendChild(masteryHead);
   const row = document.createElement("div");
   row.className = "mastery-row";
   for (const t of TIERS) {
-    const pill = document.createElement("div");
+    const pill = document.createElement("button");
     pill.className = `tier-pill tier-${t}`;
     pill.innerHTML = `<span class="n">${mastery[t]}</span>${t}`;
+    pill.addEventListener("click", () => go({ name: "mastery", focus: t }));
     row.appendChild(pill);
   }
   els.view.appendChild(row);
@@ -172,7 +162,7 @@ function renderHome() {
   // Level grid
   const lvlTitle = document.createElement("div");
   lvlTitle.className = "section-title";
-  lvlTitle.textContent = "JLPT levels — tap to focus";
+  lvlTitle.textContent = "JLPT levels — tap to browse";
   els.view.appendChild(lvlTitle);
 
   const grid = document.createElement("div");
@@ -186,11 +176,7 @@ function renderHome() {
       <div class="meta">${s.masteredOrBetter}/${s.total} mastered</div>
       <div class="bar"><span style="width:${Math.round(s.pct*100)}%"></span></div>
     `;
-    card.addEventListener("click", () => {
-      state.settings.activeLevel = n;
-      persist();
-      render();
-    });
+    card.addEventListener("click", () => go({ name: "level", level: n }));
     grid.appendChild(card);
   }
   els.view.appendChild(grid);
@@ -216,28 +202,27 @@ function aggregateMastery() {
   return tally;
 }
 
-// ---------- Learn -----------------------------------------------------------
+// ---------- Learn (intro + MCQ check) ---------------------------------------
 
 function renderLearn() {
-  const list = unseenInLevel().slice(0, remainingDailyCap());
+  const list = unseenInLevel();
   if (list.length === 0) {
     showEmpty(
       "🌱",
       "No new cards available",
-      remainingDailyCap() === 0
-        ? "You've hit your daily new-card cap. Come back tomorrow — or bump the cap in Settings."
-        : `All N${state.settings.activeLevel} kanji have been introduced. Pick another level on the home screen.`,
+      `All N${state.settings.activeLevel} kanji have been introduced. Pick another level on the home screen.`,
     );
     return;
   }
 
   let idx = 0;
+  let phase = "intro"; // "intro" → "mcq" → next
 
   const surface = document.createElement("section");
   surface.className = "card-surface";
   els.view.appendChild(surface);
 
-  function step() {
+  function renderIntro() {
     const k = list[idx];
     surface.innerHTML = `
       <div class="progress-line" style="width:${((idx)/list.length)*100}%"></div>
@@ -264,25 +249,85 @@ function renderLearn() {
       </div>
       <div class="btn-row" style="justify-content:flex-end; margin-top:auto">
         <button class="btn btn-ghost" data-act="skip">Skip</button>
-        <button class="btn btn-success" data-act="got">Got it →</button>
+        <button class="btn btn-success" data-act="quiz">Quiz me →</button>
       </div>
     `;
-    surface.querySelector('[data-act="got"]').addEventListener("click", () => commit("got"));
-    surface.querySelector('[data-act="skip"]').addEventListener("click", () => commit("skip"));
+    surface.querySelector('[data-act="quiz"]').addEventListener("click", () => {
+      phase = "mcq";
+      renderMcq();
+    });
+    surface.querySelector('[data-act="skip"]').addEventListener("click", advance);
   }
 
-  function commit(action) {
+  function renderMcq() {
     const k = list[idx];
-    if (action === "got") {
+    const correct = (k.m ?? [])[0] ?? "—";
+    const distractors = pickDistractors(k, 3);
+    const options = shuffle([correct, ...distractors]);
+    let answered = false;
+
+    surface.innerHTML = `
+      <div class="progress-line" style="width:${((idx)/list.length)*100}%"></div>
+      <div class="card-meta">
+        <span>Check · N${k.n}</span>
+        <span>${idx + 1} / ${list.length}</span>
+      </div>
+      <div class="kanji-big">${k.c}</div>
+      <div class="mcq-prompt">What does this kanji mean?</div>
+      <div class="mcq-options">
+        ${options.map((opt) => `
+          <button class="mcq-opt" data-opt="${escapeAttr(opt)}">${escapeHtml(opt)}</button>
+        `).join("")}
+      </div>
+      <div class="btn-row" style="justify-content:space-between; margin-top:auto">
+        <button class="btn btn-ghost" data-act="back">← Show again</button>
+        <button class="btn" data-act="next" disabled>Next →</button>
+      </div>
+    `;
+    surface.querySelector('[data-act="back"]').addEventListener("click", () => {
+      phase = "intro";
+      renderIntro();
+    });
+    const nextBtn = surface.querySelector('[data-act="next"]');
+    nextBtn.addEventListener("click", () => commitAndAdvance());
+
+    surface.querySelectorAll(".mcq-opt").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (answered) return;
+        answered = true;
+        const picked = btn.getAttribute("data-opt");
+        const isCorrect = picked === correct;
+        // Mark all options
+        surface.querySelectorAll(".mcq-opt").forEach((b) => {
+          const v = b.getAttribute("data-opt");
+          b.disabled = true;
+          if (v === correct) b.classList.add("correct");
+          else if (b === btn) b.classList.add("wrong");
+        });
+        // Brief feedback toast
+        toast(isCorrect ? "good" : "bad", isCorrect ? `Nice — ${k.c} = ${correct}` : `${k.c} = ${correct}`);
+        nextBtn.disabled = false;
+        nextBtn.focus();
+      });
+    });
+  }
+
+  function commitAndAdvance() {
+    const k = list[idx];
+    if (!state.cards[k.c]) {
       state.cards[k.c] = newCard();
       persist();
-      toast("good", `+ ${k.c} added to your queue`);
     }
+    advance();
+  }
+
+  function advance() {
     idx += 1;
     if (idx >= list.length) {
       showLearnDone();
     } else {
-      step();
+      phase = "intro";
+      renderIntro();
     }
   }
 
@@ -306,8 +351,52 @@ function renderLearn() {
     burst(40);
   }
 
-  step();
+  renderIntro();
 }
+
+function pickDistractors(target, n) {
+  // Prefer same-level kanji with a real meaning; fall back to any kanji.
+  const pool = kanji.filter((k) =>
+    k.c !== target.c &&
+    k.n === target.n &&
+    (k.m ?? []).length > 0
+  );
+  const fallback = kanji.filter((k) =>
+    k.c !== target.c && (k.m ?? []).length > 0
+  );
+  const seen = new Set();
+  seen.add((target.m ?? [])[0]);
+  const picked = [];
+  const tryPool = (arr) => {
+    const shuffled = shuffle(arr.slice());
+    for (const k of shuffled) {
+      const m = k.m[0];
+      if (seen.has(m)) continue;
+      seen.add(m);
+      picked.push(m);
+      if (picked.length >= n) break;
+    }
+  };
+  tryPool(pool);
+  if (picked.length < n) tryPool(fallback);
+  return picked;
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+function escapeAttr(s) { return escapeHtml(s); }
 
 // ---------- Review ----------------------------------------------------------
 
@@ -342,8 +431,8 @@ function renderReview() {
       <div class="card-meta">
         <span>Review · N${k.n} · ${tierOf(card)}</span>
         <span>
-          ${session.combo > 1 ? `<span class="combo">🔥 ${session.combo}</span>` : ""}
-          ${session.crit ? `<span class="double-xp">★ DOUBLE XP</span>` : ""}
+          ${session.combo > 1 ? `<span class="combo">combo ${session.combo}</span>` : ""}
+          ${session.crit ? `<span class="double-xp">DOUBLE XP</span>` : ""}
         </span>
       </div>
       <div class="kanji-big" data-k>${k.c}</div>
@@ -408,7 +497,6 @@ function renderReview() {
       }
       persist();
 
-      // Visual feedback
       if (award.gained > 0) {
         xpPop(award.gained, award.doubled);
         bump(els.xpWrap, "bump");
@@ -416,21 +504,19 @@ function renderReview() {
         toast("bad", `${k.c} — keep going`);
       }
       if (award.streakChanged) {
-        flame(els.streakWrap);
+        bump(els.streakWrap, "bump");
         if (state.streak.current > 1 && state.streak.current % 7 === 0) {
-          toast("streak", `🔥 ${state.streak.current}-day streak!`);
+          toast("streak", `${state.streak.current}-day streak!`);
           burst(50);
         } else if (state.streak.current === 1) {
-          toast("streak", `🔥 streak started`);
+          toast("streak", `streak started`);
         }
       }
       if (tierBefore !== tierAfter && rankUp(tierBefore, tierAfter)) {
-        toast("tier", `⬆ ${k.c} — ${tierAfter}!`);
+        toast("tier", `${k.c} → ${tierAfter}`);
         if (tierAfter === "master" || tierAfter === "enlightened" || tierAfter === "burned") burst(70);
       }
-      // Roll crit for next card
       session.crit = rollCrit();
-      // Next card
       setTimeout(nextCard, 220);
     }
   }
@@ -469,7 +555,6 @@ function renderReview() {
 }
 
 function ivLabel(card, action) {
-  // A user-facing "what happens next" hint — keeps it lightweight, no exact values.
   if (card.state !== "review") {
     if (action === "again") return "<1m";
     if (action === "hard") return "soon";
@@ -498,6 +583,143 @@ function formatDuration(s) {
   return `${m}m ${r.toString().padStart(2, "0")}s`;
 }
 
+// ---------- Level detail ----------------------------------------------------
+
+function renderLevelDetail(level) {
+  const list = kanji.filter((k) => k.n === level);
+  const s = levelStats(level);
+  const isActive = state.settings.activeLevel === level;
+
+  const head = document.createElement("section");
+  head.className = "detail-head";
+  head.innerHTML = `
+    <div class="detail-head-row">
+      <div>
+        <div class="detail-title">N${level}</div>
+        <div class="detail-sub">${list.length} kanji · ${s.masteredOrBetter} mastered</div>
+      </div>
+      <button class="btn ${isActive ? "" : "btn-primary"}" id="set-active" ${isActive ? "disabled" : ""}>
+        ${isActive ? "Active level" : "Set as active"}
+      </button>
+    </div>
+    <div class="legend">
+      <span class="legend-item"><i class="dot unseen"></i>unseen ${s.tally.unseen}</span>
+      <span class="legend-item"><i class="dot tier-apprentice"></i>apprentice ${s.tally.apprentice}</span>
+      <span class="legend-item"><i class="dot tier-guru"></i>guru ${s.tally.guru}</span>
+      <span class="legend-item"><i class="dot tier-master"></i>master ${s.tally.master}</span>
+      <span class="legend-item"><i class="dot tier-enlightened"></i>enlightened ${s.tally.enlightened}</span>
+      <span class="legend-item"><i class="dot tier-burned"></i>burned ${s.tally.burned}</span>
+    </div>
+  `;
+  els.view.appendChild(head);
+  head.querySelector("#set-active").addEventListener("click", () => {
+    state.settings.activeLevel = level;
+    persist();
+    render();
+  });
+
+  const grid = document.createElement("section");
+  grid.className = "kanji-grid";
+  for (const k of list) {
+    const card = state.cards[k.c];
+    const tier = card ? tierOf(card) : "unseen";
+    const cell = document.createElement("button");
+    cell.className = `k-cell tier-${tier}`;
+    cell.innerHTML = `<div class="k">${k.c}</div><div class="m">${escapeHtml((k.m ?? [])[0] ?? "")}</div>`;
+    cell.addEventListener("click", () => showKanjiDetail(k));
+    grid.appendChild(cell);
+  }
+  els.view.appendChild(grid);
+}
+
+function showKanjiDetail(k) {
+  const card = state.cards[k.c];
+  const tier = card ? tierOf(card) : "unseen";
+  const dlg = document.createElement("div");
+  dlg.className = "modal-backdrop";
+  dlg.innerHTML = `
+    <div class="modal">
+      <button class="modal-close" aria-label="Close">×</button>
+      <div class="modal-k">${k.c}</div>
+      <div class="modal-tier tier-${tier}">${tier}</div>
+      <div class="answer">
+        <div class="row"><span class="label">Meaning</span>
+          <span class="vals">${escapeHtml((k.m ?? []).slice(0,4).join(" · ") || "—")}</span></div>
+        <div class="row"><span class="label">On-yomi</span>
+          <span class="vals jp">${escapeHtml((k.on ?? []).join(" · ") || "—")}</span></div>
+        <div class="row"><span class="label">Kun-yomi</span>
+          <span class="vals jp">${escapeHtml((k.kun ?? []).join(" · ") || "—")}</span></div>
+        ${k.s ? `<div class="row"><span class="label">Strokes</span><span class="vals">${k.s}</span></div>` : ""}
+        ${k.f ? `<div class="row"><span class="label">Frequency</span><span class="vals">#${k.f}</span></div>` : ""}
+        ${card ? `<div class="row"><span class="label">Reps</span><span class="vals">${card.reps} · ${card.lapses} lapse${card.lapses === 1 ? "" : "s"}</span></div>` : ""}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(dlg);
+  const close = () => dlg.remove();
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) close(); });
+  dlg.querySelector(".modal-close").addEventListener("click", close);
+}
+
+// ---------- Mastery overview ------------------------------------------------
+
+function renderMastery() {
+  const groups = { apprentice: [], guru: [], master: [], enlightened: [], burned: [] };
+  for (const [char, card] of Object.entries(state.cards)) {
+    const k = kanjiByChar.get(char);
+    if (!k) continue;
+    groups[tierOf(card)].push(k);
+  }
+  // Sort within each tier by JLPT level then frequency
+  for (const t of TIERS) {
+    groups[t].sort((a, b) => (b.n - a.n) || ((a.f ?? 9e9) - (b.f ?? 9e9)));
+  }
+
+  const head = document.createElement("section");
+  head.className = "detail-head";
+  head.innerHTML = `
+    <div class="detail-head-row">
+      <div>
+        <div class="detail-title">Your kanji by stage</div>
+        <div class="detail-sub">${Object.values(groups).reduce((a, b) => a + b.length, 0)} total in study</div>
+      </div>
+    </div>
+  `;
+  els.view.appendChild(head);
+
+  const focus = route.focus;
+  const order = focus ? [focus, ...TIERS.filter((t) => t !== focus)] : TIERS.slice();
+
+  for (const t of order) {
+    const list = groups[t];
+    const section = document.createElement("section");
+    section.className = "tier-section";
+    section.innerHTML = `
+      <div class="tier-section-head">
+        <span class="tier-pill tier-${t}"><span class="n">${list.length}</span>${t}</span>
+      </div>
+    `;
+    if (list.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "tier-empty";
+      empty.textContent = "— none yet";
+      section.appendChild(empty);
+    } else {
+      const grid = document.createElement("div");
+      grid.className = "kanji-grid";
+      for (const k of list) {
+        const cell = document.createElement("button");
+        cell.className = `k-cell tier-${t}`;
+        cell.innerHTML = `<div class="k">${k.c}</div><div class="m">N${k.n}</div>`;
+        cell.addEventListener("click", () => showKanjiDetail(k));
+        grid.appendChild(cell);
+      }
+      section.appendChild(grid);
+    }
+    els.view.appendChild(section);
+  }
+}
+
 // ---------- Settings --------------------------------------------------------
 
 function renderSettings() {
@@ -510,17 +732,6 @@ function renderSettings() {
           <button class="opt ${state.settings.activeLevel === n ? "selected" : ""}" data-lvl="${n}">N${n}</button>
         `).join("")}
       </div>
-    </div>
-
-    <div class="field">
-      <h3>Daily new-card cap</h3>
-      <div class="field-row">
-        <input type="range" min="1" max="20" value="${state.settings.dailyNewCap}" id="cap" />
-        <strong id="cap-val">${state.settings.dailyNewCap}</strong>
-      </div>
-      <p style="color:var(--text-dim); font-size:13px; margin:8px 0 0">
-        Lower = steadier review load. 5–10 is sustainable for most learners.
-      </p>
     </div>
 
     <div class="field">
@@ -553,12 +764,6 @@ function renderSettings() {
       persist(); renderSettings();
     }),
   );
-  const cap = wrap.querySelector("#cap");
-  const capVal = wrap.querySelector("#cap-val");
-  cap.addEventListener("input", () => { capVal.textContent = cap.value; });
-  cap.addEventListener("change", () => {
-    state.settings.dailyNewCap = Number(cap.value); persist();
-  });
 
   wrap.querySelector("#export").addEventListener("click", () => {
     const blob = new Blob([exportState()], { type: "application/json" });
@@ -613,8 +818,7 @@ function showEmpty(emoji, title, body) {
 function xpPop(amount, doubled) {
   const el = document.createElement("div");
   el.className = "xp-pop";
-  el.textContent = `${doubled ? "★ " : ""}+${amount} XP`;
-  // Position near the XP stat in the top-right
+  el.textContent = `${doubled ? "2× " : ""}+${amount} XP`;
   const r = els.xpWrap.getBoundingClientRect();
   el.style.left = `${r.left + r.width / 2 - 24}px`;
   el.style.top = `${r.bottom + 4}px`;
@@ -645,10 +849,8 @@ function toast(kind, msg) {
   setTimeout(() => el.remove(), 2700);
 }
 
-function flame(target) { bump(target, "flame"); }
 function bump(target, cls) {
   target.classList.remove(cls);
-  // Force reflow so the animation can restart
   void target.offsetWidth;
   target.classList.add(cls);
   setTimeout(() => target.classList.remove(cls), 900);
