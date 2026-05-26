@@ -211,12 +211,7 @@ function renderHome() {
         state.settings.activeLevel = n;
         saveState(state);
         renderTopbar();
-        go({ name: "home", expanded: n });
-        // Scroll to the inline detail after render
-        requestAnimationFrame(() => {
-          const detail = els.view.querySelector(".inline-level-detail");
-          if (detail) detail.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
+        go({ name: "home", expanded: n, scroll: true });
       }
     });
     grid.appendChild(card);
@@ -355,25 +350,37 @@ function renderLearn() {
     const nextBtn = surface.querySelector('[data-act="next"]');
     nextBtn.addEventListener("click", advance);
 
-    surface.querySelectorAll(".mcq-opt").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        if (answered) return;
-        answered = true;
-        const picked = btn.getAttribute("data-opt");
-        const isCorrect = picked === correct;
-        // Mark all options
-        surface.querySelectorAll(".mcq-opt").forEach((b) => {
-          const v = b.getAttribute("data-opt");
-          b.disabled = true;
-          if (v === correct) b.classList.add("correct");
-          else if (b === btn) b.classList.add("wrong");
-        });
-        // Brief feedback toast
-        toast(isCorrect ? "good" : "bad", isCorrect ? `Nice — ${k.c} = ${correct}` : `${k.c} = ${correct}`);
-        nextBtn.disabled = false;
-        nextBtn.focus();
+    const optBtns = [...surface.querySelectorAll(".mcq-opt")];
+    const pickOption = (btn) => {
+      if (answered) return;
+      answered = true;
+      const picked = btn.getAttribute("data-opt");
+      const isCorrect = picked === correct;
+      optBtns.forEach((b) => {
+        const v = b.getAttribute("data-opt");
+        b.disabled = true;
+        if (v === correct) b.classList.add("correct");
+        else if (b === btn) b.classList.add("wrong");
       });
-    });
+      toast(isCorrect ? "good" : "bad", isCorrect ? `Nice — ${k.c} = ${correct}` : `${k.c} = ${correct}`);
+      nextBtn.disabled = false;
+      nextBtn.focus();
+    };
+    optBtns.forEach((btn) => btn.addEventListener("click", () => pickOption(btn)));
+
+    // Keyboard: 1-4 to pick option, Enter advances when answered.
+    if (viewCleanup) viewCleanup();
+    function onKey(e) {
+      if (!answered && e.code >= "Digit1" && e.code <= "Digit4") {
+        const idx = Number(e.code.slice(-1)) - 1;
+        if (optBtns[idx]) { e.preventDefault(); pickOption(optBtns[idx]); }
+      } else if (answered && (e.code === "Enter" || e.code === "Space")) {
+        e.preventDefault();
+        advance();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    viewCleanup = () => document.removeEventListener("keydown", onKey);
   }
 
   function advance() {
@@ -679,6 +686,7 @@ function formatDuration(s) {
 function renderInlineLevelDetail(level) {
   const list = kanji.filter((k) => k.n === level);
   const s = levelStats(level);
+  const shouldScroll = route.scroll === true;
 
   const wrap = document.createElement("section");
   wrap.className = "inline-level-detail";
@@ -716,6 +724,11 @@ function renderInlineLevelDetail(level) {
     grid.appendChild(cell);
   }
   els.view.appendChild(grid);
+
+  if (shouldScroll) {
+    // Now the section is in the DOM — scroll deterministically.
+    wrap.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 function showKanjiDetail(k) {
