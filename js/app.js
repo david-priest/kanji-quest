@@ -561,19 +561,18 @@ function renderReview() {
   function showReviewDone() {
     surface._cleanup?.();
     const xpEarned = state.xp.total - session.xpStart;
-    const acc = session.answered === 0 ? 0 : Math.round((session.correct / session.answered) * 100);
     const secs = Math.max(1, Math.round((Date.now() - session.started) / 1000));
     els.view.innerHTML = "";
     const e = document.createElement("section");
     e.className = "empty";
     e.innerHTML = `
-      <div class="emoji">${acc >= 90 ? "🏅" : acc >= 70 ? "💪" : "📚"}</div>
+      <div class="emoji">📚</div>
       <h2>Session complete</h2>
       <p>${session.answered} reviewed in ${formatDuration(secs)}</p>
       <div class="summary">
-        <div class="box"><div class="v" style="color:var(--yellow)">+${xpEarned}</div><div class="l">XP</div></div>
-        <div class="box"><div class="v" style="color:var(--green)">${acc}%</div><div class="l">Accuracy</div></div>
-        <div class="box"><div class="v" style="color:var(--orange)">${state.streak.current}</div><div class="l">Day streak</div></div>
+        <div class="box"><div class="v" style="color:var(--yellow)">+${xpEarned}</div><div class="l">XP earned</div></div>
+        <div class="box"><div class="v" style="color:var(--orange)">${session.again}</div><div class="l">${session.again === 1 ? "needs work" : "need work"}</div></div>
+        <div class="box"><div class="v" style="color:var(--green)">${state.streak.current}</div><div class="l">Day streak</div></div>
       </div>
       <div class="btn-row" style="justify-content:center">
         <button class="btn" data-go="home">Home</button>
@@ -584,7 +583,7 @@ function renderReview() {
     e.querySelectorAll("[data-go]").forEach((b) =>
       b.addEventListener("click", () => go({ name: b.getAttribute("data-go") })),
     );
-    if (acc >= 90 && session.answered >= 5) burst(80);
+    if (session.answered >= 20) burst(60);
   }
 
   let revealed = false;
