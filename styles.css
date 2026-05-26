@@ -682,3 +682,24 @@ button.tier-pill:hover { background: var(--bg-elev); }
 .danger-text { color: var(--red); }
 .danger-text:hover { background: rgba(220, 38, 38, .08); }
 .modal:focus { outline: none; }
+
+/* ===== Kanji search ============================================ */
+.kanji-search {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.kanji-search:focus {
+  outline: 2px solid var(--blue);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+.kanji-search::placeholder { color: var(--text-mute); }

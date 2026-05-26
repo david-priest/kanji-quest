@@ -690,6 +690,24 @@ function formatDuration(s) {
 
 // ---------- Inline level detail (expanded under home grid) ------------------
 
+function matchesQuery(k, q) {
+  if (!q) return true;
+  const lower = q.toLowerCase();
+  if (k.c.includes(q)) return true;
+  if ((k.m ?? []).some((m) => m.toLowerCase().includes(lower))) return true;
+  if ((k.on ?? []).some((r) => r.includes(q))) return true;
+  if ((k.kun ?? []).some((r) => r.includes(q))) return true;
+  return false;
+}
+
+function renderKanjiCell(k, tier) {
+  const cell = document.createElement("button");
+  cell.className = `k-cell tier-${tier}`;
+  cell.innerHTML = `<div class="k">${k.c}</div><div class="m">${escapeHtml((k.m ?? [])[0] ?? "")}</div>`;
+  cell.addEventListener("click", () => showKanjiDetail(k));
+  return cell;
+}
+
 function renderInlineLevelDetail(level) {
   const list = kanji.filter((k) => k.n === level);
   const s = levelStats(level);
@@ -713,6 +731,7 @@ function renderInlineLevelDetail(level) {
       <span class="legend-item"><i class="dot tier-enlightened"></i>enlightened ${s.tally.enlightened}</span>
       <span class="legend-item"><i class="dot tier-burned"></i>burned ${s.tally.burned}</span>
     </div>
+    <input type="search" class="kanji-search" placeholder="Search kanji, meaning, or reading…" aria-label="Search this level" />
   `;
   els.view.appendChild(wrap);
   wrap.querySelector("#collapse").addEventListener("click", () =>
@@ -721,21 +740,31 @@ function renderInlineLevelDetail(level) {
 
   const grid = document.createElement("section");
   grid.className = "kanji-grid";
-  for (const k of list) {
-    const card = state.cards[k.c];
-    const tier = card ? tierOf(card) : "unseen";
-    const cell = document.createElement("button");
-    cell.className = `k-cell tier-${tier}`;
-    cell.innerHTML = `<div class="k">${k.c}</div><div class="m">${escapeHtml((k.m ?? [])[0] ?? "")}</div>`;
-    cell.addEventListener("click", () => showKanjiDetail(k));
-    grid.appendChild(cell);
-  }
   els.view.appendChild(grid);
 
-  if (shouldScroll) {
-    // Now the section is in the DOM — scroll deterministically.
-    wrap.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  const renderGrid = (q) => {
+    grid.innerHTML = "";
+    let shown = 0;
+    for (const k of list) {
+      if (!matchesQuery(k, q)) continue;
+      const card = state.cards[k.c];
+      const tier = card ? tierOf(card) : "unseen";
+      grid.appendChild(renderKanjiCell(k, tier));
+      shown += 1;
+    }
+    if (shown === 0) {
+      const empty = document.createElement("div");
+      empty.className = "tier-empty";
+      empty.textContent = "— no matches";
+      grid.appendChild(empty);
+    }
+  };
+  renderGrid("");
+
+  const search = wrap.querySelector(".kanji-search");
+  search.addEventListener("input", (e) => renderGrid(e.target.value.trim()));
+
+  if (shouldScroll) wrap.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function showKanjiDetail(k) {
@@ -834,10 +863,10 @@ function renderMastery() {
     if (!k) continue;
     groups[tierOf(card)].push(k);
   }
-  // Sort within each tier by JLPT level then frequency
   for (const t of TIERS) {
     groups[t].sort((a, b) => (b.n - a.n) || ((a.f ?? 9e9) - (b.f ?? 9e9)));
   }
+  const total = Object.values(groups).reduce((a, b) => a + b.length, 0);
 
   const head = document.createElement("section");
   head.className = "detail-head";
@@ -845,43 +874,62 @@ function renderMastery() {
     <div class="detail-head-row">
       <div>
         <div class="detail-title">Your kanji by stage</div>
-        <div class="detail-sub">${Object.values(groups).reduce((a, b) => a + b.length, 0)} total in study</div>
+        <div class="detail-sub">${total} total in study</div>
       </div>
     </div>
+    <input type="search" class="kanji-search" placeholder="Search your kanji, meaning, or reading…" aria-label="Search your kanji" />
   `;
   els.view.appendChild(head);
 
   const focus = route.focus;
   const order = focus ? [focus, ...TIERS.filter((t) => t !== focus)] : TIERS.slice();
 
+  // Mount empty tier sections; rerender on search.
+  const sections = new Map(); // tier → { section, grid }
   for (const t of order) {
-    const list = groups[t];
     const section = document.createElement("section");
     section.className = "tier-section";
     section.innerHTML = `
       <div class="tier-section-head">
-        <span class="tier-pill tier-${t}"><span class="n">${list.length}</span>${t}</span>
+        <span class="tier-pill tier-${t}"><span class="n" data-count></span>${t}</span>
       </div>
     `;
-    if (list.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "tier-empty";
-      empty.textContent = "— none yet";
-      section.appendChild(empty);
-    } else {
-      const grid = document.createElement("div");
-      grid.className = "kanji-grid";
-      for (const k of list) {
-        const cell = document.createElement("button");
-        cell.className = `k-cell tier-${t}`;
-        cell.innerHTML = `<div class="k">${k.c}</div><div class="m">N${k.n}</div>`;
-        cell.addEventListener("click", () => showKanjiDetail(k));
-        grid.appendChild(cell);
-      }
-      section.appendChild(grid);
-    }
+    const grid = document.createElement("div");
+    grid.className = "kanji-grid";
+    section.appendChild(grid);
     els.view.appendChild(section);
+    sections.set(t, { section, grid });
   }
+
+  const renderAll = (q) => {
+    for (const t of order) {
+      const { section, grid } = sections.get(t);
+      grid.innerHTML = "";
+      const list = groups[t].filter((k) => matchesQuery(k, q));
+      section.querySelector("[data-count]").textContent = q
+        ? `${list.length}/${groups[t].length}`
+        : `${groups[t].length}`;
+      if (list.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "tier-empty";
+        empty.textContent = q ? "— no matches" : "— none yet";
+        grid.appendChild(empty);
+      } else {
+        for (const k of list) {
+          const cell = document.createElement("button");
+          cell.className = `k-cell tier-${t}`;
+          cell.innerHTML = `<div class="k">${k.c}</div><div class="m">N${k.n}</div>`;
+          cell.addEventListener("click", () => showKanjiDetail(k));
+          grid.appendChild(cell);
+        }
+      }
+    }
+  };
+  renderAll("");
+
+  head.querySelector(".kanji-search").addEventListener("input", (e) => {
+    renderAll(e.target.value.trim());
+  });
 }
 
 // ---------- Settings --------------------------------------------------------
