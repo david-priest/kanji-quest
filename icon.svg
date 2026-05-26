@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7e22ce"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <text x="256" y="380" font-size="360" text-anchor="middle"
+        font-family="'Hiragino Mincho ProN','Yu Mincho','Noto Serif JP','Source Han Serif',serif"
+        fill="#ffffff">漢</text>
+</svg>
