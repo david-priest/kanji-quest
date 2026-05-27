@@ -976,6 +976,13 @@ button.tier-pill:hover { background: var(--bg-elev); }
   font-size: 11px; opacity: .75; font-weight: 700;
 }
 .reading-filters .chip.selected .chip-n { opacity: 1; }
+.reading-footnote {
+  margin: 18px 0 4px;
+  text-align: center;
+  color: var(--text-mute);
+  font-size: 12px;
+  letter-spacing: .5px;
+}
 
 .reading-grid {
   display: grid; gap: 10px;

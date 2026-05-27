@@ -1411,12 +1411,49 @@ function hashStr(s) {
   return h >>> 0;
 }
 
+// Mulberry32: small, fast, seedable PRNG. Used to deterministically
+// shuffle the readings pool by date so 'today's selection' is the
+// same all day, but different tomorrow.
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    let t = (a += 0x6D2B79F7);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function deterministicShuffle(arr, seed) {
+  const rng = mulberry32(seed);
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 /**
- * Deterministic daily reading: same date → same reading for everyone.
- * Prefers readings within ±1 of the user's recommended level if there
- * are enough candidates, otherwise picks from the full pool.
+ * The daily-rotated selection: a deterministic 10-card shuffle of the
+ * full readings pool, optionally restricted to a level. The first
+ * element is treated as 'today's reading' (featured); the rest go
+ * into the smaller grid below.
  */
+function dailyReadingSet(level = null, count = 10) {
+  if (readings.length === 0) return [];
+  const pool = level == null
+    ? readings.slice()
+    : readings.filter((r) => r.level === level);
+  if (pool.length === 0) return [];
+  const seed = hashStr(todayKey() + ":" + (level ?? "all"));
+  const shuffled = deterministicShuffle(pool, seed);
+  return shuffled.slice(0, Math.min(count, shuffled.length));
+}
+
 function dailyReading() {
+  // Featured pick: first card of the daily set, weighted toward the
+  // user's recommended level when there are enough nearby readings.
   if (readings.length === 0) return null;
   const rec = recommendedReadingLevel();
   let pool = readings;
@@ -1499,17 +1536,29 @@ function renderReadingList() {
     });
   });
 
-  // --- Full grid (filtered) ---
+  // --- Today's rotation (max 10 cards total, including today's feature) ---
   const rec = recommendedReadingLevel();
-  const filtered = filterState === "all"
-    ? readings.slice()
-    : readings.filter((r) => r.level === filterState);
-  // Easiest first within a level group
-  filtered.sort((a, b) => b.level - a.level);
+  const levelFilter = filterState === "all" ? null : filterState;
+  // Pull 9 more cards from the daily-rotated pool, excluding today's
+  // featured pick (when it's in the same level filter).
+  const dailySet = dailyReadingSet(levelFilter, 12);
+  const others = dailySet
+    .filter((r) => !today || r.id !== today.id)
+    .slice(0, 9);
+
+  const subhead = document.createElement("div");
+  subhead.className = "section-title section-title-row";
+  subhead.innerHTML = `
+    <span>More to read · rotates daily</span>
+    <span style="color:var(--text-mute); font-size:12px; letter-spacing:.5px; text-transform:none">
+      ${others.length} of ${counts[filterState] ?? readings.length}
+    </span>
+  `;
+  els.view.appendChild(subhead);
 
   const grid = document.createElement("section");
   grid.className = "reading-grid";
-  for (const r of filtered) {
+  for (const r of others) {
     const card = document.createElement("button");
     const isRec = rec != null && r.level === rec;
     card.className = `reading-card${isRec ? " recommended" : ""}`;
@@ -1527,12 +1576,19 @@ function renderReadingList() {
     grid.appendChild(card);
   }
   els.view.appendChild(grid);
-  if (filtered.length === 0) {
+
+  if (others.length === 0) {
     const empty = document.createElement("div");
     empty.className = "tier-empty";
     empty.textContent = "— no readings at this level —";
     els.view.appendChild(empty);
   }
+
+  // Footer hint about rotation
+  const footnote = document.createElement("p");
+  footnote.className = "reading-footnote";
+  footnote.textContent = `${counts[filterState] ?? readings.length} passages in the pool — selection rotates daily.`;
+  els.view.appendChild(footnote);
 }
 
 function renderReadingDetail(id) {

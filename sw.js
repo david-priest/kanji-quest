@@ -8,7 +8,7 @@
 // breaking update to any precached file — that triggers the new SW to
 // clean out old caches on activate.
 
-const CACHE_VERSION = "v11";
+const CACHE_VERSION = "v12";
 const APP_CACHE = `kanji-quest-app-${CACHE_VERSION}`;
 const DATA_CACHE = `kanji-quest-data-${CACHE_VERSION}`;
 
