@@ -898,6 +898,145 @@ button.tier-pill:hover { background: var(--bg-elev); }
 }
 .kaeru-asker .kaeru { filter: drop-shadow(0 3px 8px rgba(15, 23, 42, .12)); }
 
+/* ===== Reading hall ============================================ */
+.reading-hall-link { margin: 18px 0 4px; }
+.hall-btn {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%;
+  padding: 14px 16px;
+  background: linear-gradient(160deg, #ffffff 0%, #fbfaff 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  text-align: left;
+  box-shadow: var(--shadow);
+  transition: transform .08s ease, background .12s ease;
+}
+.hall-btn:hover { background: linear-gradient(160deg, #ffffff 0%, #f4f0fb 100%); }
+.hall-btn:active { transform: translateY(1px); }
+.hall-text .hall-title {
+  font-weight: 700; font-size: 16px; letter-spacing: .3px;
+  background: linear-gradient(135deg, var(--purple), var(--blue));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hall-text .hall-sub { color: var(--text-dim); font-size: 13px; margin-top: 2px; }
+.hall-arrow {
+  font-size: 24px; font-weight: 800; color: var(--purple);
+  margin-left: 10px;
+}
+
+.reading-grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  margin: 8px 0 16px;
+}
+.reading-card {
+  background: var(--bg-elev); border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 4px;
+  text-align: left;
+  transition: transform .08s ease, background .12s ease;
+}
+.reading-card:hover { background: var(--bg-elev-2); }
+.reading-card:active { transform: translateY(1px); }
+.reading-card.recommended {
+  outline: 2px solid var(--purple);
+  outline-offset: -1px;
+}
+.reading-card-head {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 4px;
+}
+.reading-level {
+  font-size: 11px; font-weight: 800; letter-spacing: 1px;
+  padding: 3px 8px; border-radius: 999px;
+  color: white;
+}
+.reading-level.n5 { background: #16a34a; }
+.reading-level.n4 { background: #2563eb; }
+.reading-level.n3 { background: #9333ea; }
+.reading-level.n2 { background: #ea580c; }
+.reading-level.n1 { background: #b91c1c; }
+.reading-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--purple);
+}
+.reading-title { font-family: var(--font-jp); font-size: 22px; font-weight: 700; }
+.reading-titleEn { color: var(--text-dim); font-size: 13px; }
+.reading-source { color: var(--text-mute); font-size: 11px; margin-top: 4px; }
+
+.reading-passage {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 22px 22px 20px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.passage {
+  font-family: var(--font-jp);
+  font-size: 22px;
+  line-height: 2.6;
+  color: var(--text);
+}
+.passage ruby rt {
+  font-family: var(--font-jp);
+  font-size: 11px;
+  color: var(--blue);
+  font-weight: 500;
+}
+.kanji-tap {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 0 2px;
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+.kanji-tap:hover { background: rgba(96, 165, 250, .15); }
+.kanji-tap.recognised {
+  background: rgba(22, 163, 74, .18);
+  color: var(--green-deep);
+  font-weight: 700;
+}
+.reading-translation {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.reading-translation > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 13px; font-weight: 600;
+  color: var(--blue);
+  letter-spacing: .3px;
+  display: inline-flex; align-items: center; gap: 6px;
+  user-select: none;
+}
+.reading-translation > summary::-webkit-details-marker { display: none; }
+.reading-translation > summary::before {
+  content: "▸"; font-size: 10px; transition: transform .12s ease;
+  display: inline-block;
+}
+.reading-translation[open] > summary::before { transform: rotate(90deg); }
+.reading-en {
+  margin-top: 8px;
+  color: var(--text);
+  line-height: 1.55;
+  font-size: 14px;
+}
+.reading-stats { margin-bottom: 14px; }
+.reading-credit {
+  margin-top: 18px; text-align: center;
+  font-size: 11px; color: var(--text-mute);
+}
+.reading-credit a { color: var(--blue); }
+
 /* Lore tagline */
 .lore-tagline {
   text-align: center;

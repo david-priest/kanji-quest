@@ -23,6 +23,7 @@ let state = loadState();
 let kanji = [];                 // [{c, n, s, f, m, on, kun, r}]
 let kanjiByChar = new Map();    // char -> entry
 let examples = {};              // { char: { tokens: [{t, r|null}, ...] } }
+let readings = [];              // [{ id, title, level, tokens, en, ... }]
 let route = { name: "home" };
 let viewCleanup = null;         // global teardown for whichever view is mounted
 
@@ -41,6 +42,15 @@ let viewCleanup = null;         // global teardown for whichever view is mounted
       if (route.name === "learn" || route.name === "review") render();
     })
     .catch(() => { examples = {}; });
+
+  // readings.json is small but only needed in the Read views.
+  fetch("./data/readings.json")
+    .then((r) => r.json())
+    .then((j) => {
+      readings = j;
+      if (route.name === "readings" || route.name === "reading") render();
+    })
+    .catch(() => { readings = []; });
 
   els.navHome.addEventListener("click", () => go({ name: "home" }));
   els.navSettings.addEventListener("click", () => go({ name: "settings" }));
@@ -132,6 +142,8 @@ function render() {
     case "quiz":     return renderQuizSetup();
     case "quiz-run": return renderQuizRun();
     case "catchup":  return renderCatchup();
+    case "readings": return renderReadingList();
+    case "reading":  return renderReadingDetail(route.id);
   }
 }
 
@@ -248,6 +260,20 @@ function renderHome() {
   if (expanded != null) {
     renderInlineLevelDetail(expanded);
   }
+
+  // Reading hall — unobtrusive entry point to a separate panel.
+  const readingHall = document.createElement("section");
+  readingHall.className = "reading-hall-link";
+  readingHall.innerHTML = `
+    <button class="hall-btn" data-go="readings">
+      <div class="hall-text">
+        <div class="hall-title">Reading hall</div>
+        <div class="hall-sub">Short passages with furigana — tap kanji you recognise</div>
+      </div>
+      <div class="hall-arrow">→</div>
+    </button>
+  `;
+  els.view.appendChild(readingHall);
 
   const lore = document.createElement("p");
   lore.className = "lore-tagline";
@@ -1354,6 +1380,239 @@ function renderSettings() {
     state = loadState();
     persist(); go({ name: "home" });
   });
+}
+
+// ---------- Reading hall ----------------------------------------------------
+
+/** Lowest (easiest-N) tier in a reading where the user has all kanji at
+ * or above tier 'guru'. Used to decide which readings are 'recommended'. */
+function recommendedReadingLevel() {
+  const byLevel = new Map();      // N → [{ k, hasGuruOrBetter }]
+  for (const k of kanji) {
+    if (!byLevel.has(k.n)) byLevel.set(k.n, []);
+    const card = state.cards[k.c];
+    const tier = card ? tierOf(card) : "unseen";
+    const hasGuru = tier !== "unseen" && tier !== "apprentice";
+    byLevel.get(k.n).push(hasGuru);
+  }
+  let recommended = null;
+  for (const n of [5, 4, 3, 2, 1]) {
+    const list = byLevel.get(n) ?? [];
+    if (!list.length) continue;
+    const known = list.filter(Boolean).length;
+    if (known / list.length >= 0.5) recommended = n;
+  }
+  return recommended;
+}
+
+function renderReadingList() {
+  const head = document.createElement("section");
+  head.className = "detail-head";
+  head.innerHTML = `
+    <div class="detail-head-row">
+      <div>
+        <div class="detail-title">Reading hall</div>
+        <div class="detail-sub">Short passages with furigana — tap kanji you recognise.</div>
+      </div>
+      <button class="btn btn-ghost" data-go="home">← Home</button>
+    </div>
+  `;
+  els.view.appendChild(head);
+  head.querySelector("[data-go]").addEventListener("click", () => go({ name: "home" }));
+
+  if (readings.length === 0) {
+    const loading = document.createElement("div");
+    loading.className = "tier-empty";
+    loading.textContent = "Loading readings…";
+    els.view.appendChild(loading);
+    return;
+  }
+
+  const rec = recommendedReadingLevel();
+  const grid = document.createElement("section");
+  grid.className = "reading-grid";
+  for (const r of readings) {
+    const card = document.createElement("button");
+    const isRec = rec != null && r.level === rec;
+    card.className = `reading-card${isRec ? " recommended" : ""}`;
+    const sourceLabel = r.source === "Aozora Bunko" ? "Folk tale · Aozora" : r.source;
+    card.innerHTML = `
+      <div class="reading-card-head">
+        <span class="reading-level n${r.level}">N${r.level}</span>
+        ${isRec ? `<span class="reading-badge">recommended</span>` : ""}
+      </div>
+      <div class="reading-title">${escapeHtml(r.title)}</div>
+      <div class="reading-titleEn">${escapeHtml(r.titleEn)}</div>
+      <div class="reading-source">${escapeHtml(sourceLabel)}</div>
+    `;
+    card.addEventListener("click", () => go({ name: "reading", id: r.id }));
+    grid.appendChild(card);
+  }
+  els.view.appendChild(grid);
+}
+
+function renderReadingDetail(id) {
+  const r = readings.find((x) => x.id === id);
+  if (!r) {
+    showEmpty("📚", "Reading not found", "Tap below to head back to the hall.");
+    return;
+  }
+
+  // Build a per-character recognition map for the session.
+  // (Not persisted — fresh state each open.)
+  const recognized = new Set();
+
+  const head = document.createElement("section");
+  head.className = "detail-head";
+  head.innerHTML = `
+    <div class="detail-head-row">
+      <div>
+        <div class="detail-title">${escapeHtml(r.title)}</div>
+        <div class="detail-sub">${escapeHtml(r.titleEn)} · N${r.level} · ${escapeHtml(r.source)}</div>
+      </div>
+      <button class="btn btn-ghost" data-go="readings">← Hall</button>
+    </div>
+    <div class="legend" style="border-top:0; padding-top:0; margin-top:8px">
+      <span class="legend-item">Tap a kanji to mark it as one you recognise. Tap again to undo.</span>
+    </div>
+  `;
+  els.view.appendChild(head);
+  head.querySelector("[data-go]").addEventListener("click", () => go({ name: "readings" }));
+
+  // The passage body. Render each token; for tokens that contain kanji,
+  // each kanji character is wrapped in a tappable <button>.
+  const passage = document.createElement("section");
+  passage.className = "reading-passage";
+  const showFurigana = true;
+  passage.appendChild(buildPassage(r.tokens, recognized, refreshStats, showFurigana));
+  els.view.appendChild(passage);
+
+  // English translation, hidden behind a disclosure (same UX as the
+  // example-sentence translations).
+  if (r.en) {
+    const en = document.createElement("details");
+    en.className = "reading-translation";
+    en.innerHTML = `
+      <summary>Show English translation</summary>
+      <div class="reading-en">${escapeHtml(r.en)}</div>
+    `;
+    els.view.appendChild(en);
+  }
+
+  // Stats bar (updates on tap).
+  const stats = document.createElement("section");
+  stats.className = "reading-stats";
+  els.view.appendChild(stats);
+  const total = countKanji(r.tokens);
+
+  function refreshStats() {
+    const got = recognized.size;
+    stats.innerHTML = `
+      <div class="summary">
+        <div class="box"><div class="v" style="color:var(--green)">${got}</div><div class="l">recognised</div></div>
+        <div class="box"><div class="v" style="color:var(--text)">${total}</div><div class="l">total kanji</div></div>
+        <div class="box"><div class="v" style="color:var(--blue)">${total === 0 ? 0 : Math.round((got / total) * 100)}%</div><div class="l">coverage</div></div>
+      </div>
+    `;
+  }
+  refreshStats();
+
+  // Source attribution / link
+  const credit = document.createElement("p");
+  credit.className = "reading-credit";
+  credit.innerHTML = `Source: <a href="${escapeHtml(r.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.source)}</a>${r.author ? ` · ${escapeHtml(r.author)}` : ""} · <span>${escapeHtml(r.license)}</span>`;
+  els.view.appendChild(credit);
+}
+
+function buildPassage(tokens, recognized, onChange, showFurigana) {
+  const root = document.createElement("div");
+  root.className = "passage";
+  for (const tok of tokens) {
+    if (!tok.t) continue;
+    // Token might contain multiple kanji; render character-by-character
+    // so each kanji can be its own tap target.
+    const surface = tok.t;
+    const reading = tok.r;
+    const hasKanji = [...surface].some((c) => isKanjiChar(c));
+    if (!hasKanji) {
+      // Pure kana / punctuation — just text
+      const span = document.createElement("span");
+      span.textContent = surface;
+      root.appendChild(span);
+      continue;
+    }
+    if (reading && surface.length > 0) {
+      // The whole token gets a ruby annotation for the reading.
+      const ruby = document.createElement("ruby");
+      // Surface: split into chars so each kanji is tappable
+      for (const ch of surface) {
+        if (isKanjiChar(ch)) {
+          const btn = document.createElement("button");
+          btn.className = "kanji-tap";
+          btn.textContent = ch;
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleRecognised(btn, ch, recognized, onChange);
+          });
+          ruby.appendChild(btn);
+        } else {
+          const span = document.createElement("span");
+          span.textContent = ch;
+          ruby.appendChild(span);
+        }
+      }
+      if (showFurigana) {
+        const rt = document.createElement("rt");
+        rt.textContent = reading;
+        ruby.appendChild(rt);
+      }
+      root.appendChild(ruby);
+    } else {
+      // No reading — render plain, but each kanji is still tappable.
+      for (const ch of surface) {
+        if (isKanjiChar(ch)) {
+          const btn = document.createElement("button");
+          btn.className = "kanji-tap";
+          btn.textContent = ch;
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleRecognised(btn, ch, recognized, onChange);
+          });
+          root.appendChild(btn);
+        } else {
+          const span = document.createElement("span");
+          span.textContent = ch;
+          root.appendChild(span);
+        }
+      }
+    }
+  }
+  return root;
+}
+
+function toggleRecognised(btn, ch, recognized, onChange) {
+  const key = btn.dataset.key ?? `${ch}-${Math.random().toString(36).slice(2, 8)}`;
+  btn.dataset.key = key;
+  if (recognized.has(key)) {
+    recognized.delete(key);
+    btn.classList.remove("recognised");
+  } else {
+    recognized.add(key);
+    btn.classList.add("recognised");
+    // Light XP: 1 per recognized kanji, no streak/combo interaction.
+    state.xp.total += 1;
+    state.xp.byDay[todayKey()] = (state.xp.byDay[todayKey()] ?? 0) + 1;
+    persist();
+  }
+  onChange();
+}
+
+function countKanji(tokens) {
+  let n = 0;
+  for (const tok of tokens) {
+    for (const ch of tok.t) if (isKanjiChar(ch)) n += 1;
+  }
+  return n;
 }
 
 // ---------- Quick catch-up --------------------------------------------------
