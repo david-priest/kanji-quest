@@ -68,12 +68,117 @@ const AOZORA = [
     sentenceLimit: 4,
     en: "Long, long ago, in a certain place, there flowed a great river. It was so swift and turbulent that even the most skilled carpenter could never build a bridge across it. Every time one was built, the very next day a flood would come and wash it away.",
   },
+  {
+    id: "kintaro",
+    title: "金太郎",
+    titleEn: "Kintarō (The Golden Boy)",
+    author: "楠山 正雄",
+    url: "https://www.aozora.gr.jp/cards/000329/files/18337_11942.html",
+    sentenceLimit: 4,
+    en: "Long, long ago, deep in the mountains of Ashigara, there lived a little boy called Kintarō. His mother, Yamauba, was a mountain witch, and so the boy was very strong from the day he was born — strong enough to wrestle bears as playmates.",
+  },
+  {
+    id: "nezumi-yomeiri",
+    title: "ねずみの嫁入り",
+    titleEn: "The Mouse's Wedding",
+    author: "楠山 正雄",
+    url: "https://www.aozora.gr.jp/cards/000329/files/18335_11944.html",
+    sentenceLimit: 4,
+    en: "Long ago, in a certain country, there was a mouse father and mother who had one beautiful daughter. They wanted to give her in marriage to the very greatest being in all the world. After much thought, they decided that nothing in the world was greater than the sun — so they would marry her to the sun.",
+  },
+  {
+    id: "bunbuku",
+    title: "文福茶がま",
+    titleEn: "Bunbuku Chagama (The Magic Tea-Kettle)",
+    author: "楠山 正雄",
+    url: "https://www.aozora.gr.jp/cards/000329/files/18336_11941.html",
+    sentenceLimit: 4,
+    en: "Long ago, in the country of Jōshū, at a temple called Morinji, there lived an old priest. The priest treasured a single iron tea-kettle. One day, he decided to use it to boil water for tea — but as the kettle grew hot on the fire, something very strange happened.",
+  },
+  {
+    id: "osho-kozo",
+    title: "和尚さんと小僧",
+    titleEn: "The Priest and the Little Monk",
+    author: "楠山 正雄",
+    url: "https://www.aozora.gr.jp/cards/000329/files/18387_11946.html",
+    sentenceLimit: 4,
+    en: "Long ago, at a certain temple, there lived an old priest and one little novice monk. The priest was rather stingy, and whenever someone gave him sweets, he would hide them away so that he could eat them all by himself. The little monk, watching this, thought it most unfair.",
+  },
+  {
+    id: "urikohime",
+    title: "瓜子姫子",
+    titleEn: "Urikohime (The Melon Princess)",
+    author: "楠山 正雄",
+    url: "https://www.aozora.gr.jp/cards/000329/files/43459_24404.html",
+    sentenceLimit: 4,
+    en: "Long, long ago, in a certain place, there lived an old man and an old woman. They had no children, and felt terribly lonely. One day, as the old woman was washing clothes by the river, a large melon came floating down to her — bobbing on the current.",
+  },
+  {
+    id: "kumo-no-ito",
+    title: "蜘蛛の糸",
+    titleEn: "The Spider's Thread",
+    author: "芥川 龍之介",
+    url: "https://www.aozora.gr.jp/cards/000879/files/92_14545.html",
+    sentenceLimit: 3,
+    en: "One day, the Buddha was wandering alone by the edge of the Pond of Lotuses in Paradise. The lotuses blooming on the pond were all perfect, white as jewels, and from their golden centres rose a fragrance that filled the air with an indescribable, exquisite scent.",
+  },
+  {
+    id: "ryori-ten",
+    title: "注文の多い料理店",
+    titleEn: "The Restaurant of Many Orders",
+    author: "宮沢 賢治",
+    url: "https://www.aozora.gr.jp/cards/000081/files/43754_17659.html",
+    sentenceLimit: 4,
+    en: "Two young gentlemen, splendidly equipped like British soldiers, with shining new rifles slung over their shoulders, were tramping through the mountains at a place so deep that even the leaves seemed to whisper. With them they had brought two big dogs the colour of polar bears.",
+  },
 ];
 
 // Hand-picked Tatoeba sentences (verified in jpn_sentences.tsv), stitched
 // into mini paragraphs by theme. English translations written from the
 // Japanese. All sentences are CC-BY 2.0 FR via Tatoeba.
 const TATOEBA = [
+  // ----- N5-aimed (use only the simplest kanji set) -----
+  {
+    id: "self-intro",
+    title: "はじめまして",
+    titleEn: "Pleased to meet you",
+    sentences: [
+      "はじめまして。",
+      "私の名前は田中です。",
+      "日本人です。",
+      "東京の大学で日本語を学んでいます。",
+      "毎日先生と話します。",
+    ],
+    en: "Pleased to meet you. My name is Tanaka. I'm Japanese. I study Japanese at a university in Tokyo. I talk with my teacher every day.",
+  },
+  {
+    id: "good-weather",
+    title: "いい天気",
+    titleEn: "Nice weather",
+    sentences: [
+      "今日は天気がいいです。",
+      "空が青いです。",
+      "山がよく見えます。",
+      "子どもたちは川で水を見ています。",
+    ],
+    en: "The weather is nice today. The sky is blue. You can see the mountains clearly. The children are watching the water in the river.",
+  },
+  {
+    id: "ichi-nichi",
+    title: "私の一日",
+    titleEn: "My day",
+    sentences: [
+      "私は毎日学校に行きます。",
+      "学校で日本語と英語を学びます。",
+      "お昼にパンを食べます。",
+      "夜は家で本を読みます。",
+    ],
+    en: "Every day I go to school. At school I learn Japanese and English. At lunch I eat bread. In the evening I read a book at home.",
+  },
+];
+
+// Append the original N4/N3 paragraphs after the N5-aimed ones above.
+TATOEBA.push(...[
   {
     id: "morning-routine",
     title: "朝の生活",
@@ -122,7 +227,91 @@ const TATOEBA = [
     ],
     en: "I went to a restaurant with my friend. I ate fish, and my friend ate meat. It was very delicious. I'd like to come back again next week.",
   },
-];
+  {
+    id: "school-life",
+    title: "学校の一日",
+    titleEn: "A school day",
+    sentences: [
+      "私は中学生です。",
+      "学校は家の近くにあります。",
+      "毎日歩いて行きます。",
+      "数学の先生はとてもやさしいです。",
+    ],
+    en: "I'm a middle-school student. The school is near my house. I walk there every day. The maths teacher is very kind.",
+  },
+  {
+    id: "weekend",
+    title: "週末",
+    titleEn: "The weekend",
+    sentences: [
+      "土曜日と日曜日は学校に行きません。",
+      "朝はゆっくり起きます。",
+      "友達とカフェでコーヒーを飲みます。",
+      "夜は家で映画を見ます。",
+    ],
+    en: "I don't go to school on Saturdays and Sundays. I get up slowly in the morning. I have coffee with friends at a café. In the evening I watch a film at home.",
+  },
+  {
+    id: "shopping",
+    title: "買い物",
+    titleEn: "Shopping",
+    sentences: [
+      "今日は母と買い物に行きました。",
+      "近くのスーパーで野菜と肉を買いました。",
+      "それからパン屋でパンを買いました。",
+      "家に帰ってから夕ご飯を作りました。",
+    ],
+    en: "Today I went shopping with my mother. We bought vegetables and meat at a nearby supermarket. Then we got bread at the bakery. After getting home, we made dinner.",
+  },
+  {
+    id: "pets",
+    title: "うちの犬",
+    titleEn: "Our dog",
+    sentences: [
+      "私の家には小さい犬がいます。",
+      "名前はポチです。",
+      "毎朝、公園を一緒に散歩します。",
+      "ポチはボールで遊ぶのが大好きです。",
+    ],
+    en: "We have a small dog at home. Her name is Pochi. Every morning we walk together in the park. Pochi loves playing with a ball.",
+  },
+  {
+    id: "hobby",
+    title: "私の趣味",
+    titleEn: "My hobby",
+    sentences: [
+      "私の趣味は読書です。",
+      "週末はよく図書館に行きます。",
+      "静かな場所で本を読むのが好きです。",
+      "最近は日本の小説を読んでいます。",
+    ],
+    en: "My hobby is reading. I often go to the library on weekends. I like reading books in a quiet place. Recently I've been reading Japanese novels.",
+  },
+  {
+    id: "summer-trip",
+    title: "夏休みの思い出",
+    titleEn: "A summer holiday memory",
+    sentences: [
+      "去年の夏、家族と海に行きました。",
+      "毎日泳いだり、貝がらを集めたりしました。",
+      "夜は浜辺で花火を見ました。",
+      "とても楽しい一週間でした。",
+    ],
+    en: "Last summer I went to the sea with my family. Every day we swam and collected seashells. At night we watched fireworks on the beach. It was a very fun week.",
+  },
+  {
+    id: "train-to-tokyo",
+    title: "東京へ",
+    titleEn: "To Tokyo",
+    sentences: [
+      "明日、新幹線で東京に行きます。",
+      "東京駅で友達が待っています。",
+      "二人で美術館に行く予定です。",
+      "夜は一緒に晩ご飯を食べます。",
+    ],
+    en: "Tomorrow I'm going to Tokyo on the shinkansen. My friend is waiting at Tokyo Station. We plan to visit an art museum together. In the evening we'll have dinner together.",
+  },
+]);
 
 function isKanji(ch) {
   const cp = ch.codePointAt(0);
