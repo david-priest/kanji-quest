@@ -1405,6 +1405,29 @@ function recommendedReadingLevel() {
   return recommended;
 }
 
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (((h << 5) - h) + s.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
+/**
+ * Deterministic daily reading: same date → same reading for everyone.
+ * Prefers readings within ±1 of the user's recommended level if there
+ * are enough candidates, otherwise picks from the full pool.
+ */
+function dailyReading() {
+  if (readings.length === 0) return null;
+  const rec = recommendedReadingLevel();
+  let pool = readings;
+  if (rec != null) {
+    const near = readings.filter((r) => Math.abs(r.level - rec) <= 1);
+    if (near.length >= 5) pool = near;
+  }
+  const seed = hashStr(todayKey());
+  return pool[seed % pool.length];
+}
+
 function renderReadingList() {
   const head = document.createElement("section");
   head.className = "detail-head";
@@ -1412,7 +1435,7 @@ function renderReadingList() {
     <div class="detail-head-row">
       <div>
         <div class="detail-title">Reading hall</div>
-        <div class="detail-sub">Short passages with furigana — tap kanji you recognise.</div>
+        <div class="detail-sub">${readings.length || "…"} short passages with furigana — tap kanji you recognise.</div>
       </div>
       <button class="btn btn-ghost" data-go="home">← Home</button>
     </div>
@@ -1428,10 +1451,65 @@ function renderReadingList() {
     return;
   }
 
+  // --- Today's reading (deterministic per date) ---
+  const today = dailyReading();
+  if (today) {
+    const sourceLabel = today.source === "Aozora Bunko" ? "Folk tale · Aozora" : today.source;
+    const todayBlock = document.createElement("button");
+    todayBlock.className = "reading-today";
+    todayBlock.innerHTML = `
+      <div class="today-label">Today's reading</div>
+      <div class="reading-card-head">
+        <span class="reading-level n${today.level}">N${today.level}</span>
+        <span class="today-date">${todayKey()}</span>
+      </div>
+      <div class="reading-title">${escapeHtml(today.title)}</div>
+      <div class="reading-titleEn">${escapeHtml(today.titleEn)}</div>
+      <div class="reading-source">${escapeHtml(sourceLabel)}</div>
+    `;
+    todayBlock.addEventListener("click", () => go({ name: "reading", id: today.id }));
+    els.view.appendChild(todayBlock);
+  }
+
+  // --- Filter chips ---
+  const filterState = route.level ?? "all";
+  const filterRow = document.createElement("div");
+  filterRow.className = "reading-filters";
+  const counts = {
+    all: readings.length,
+    5: readings.filter((r) => r.level === 5).length,
+    4: readings.filter((r) => r.level === 4).length,
+    3: readings.filter((r) => r.level === 3).length,
+    2: readings.filter((r) => r.level === 2).length,
+    1: readings.filter((r) => r.level === 1).length,
+  };
+  filterRow.innerHTML = `
+    <button class="chip ${filterState === "all" ? "selected" : ""}" data-f="all">All <span class="chip-n">${counts.all}</span></button>
+    ${[5,4,3,2,1].map((n) => `
+      <button class="chip ${String(filterState) === String(n) ? "selected" : ""}" data-f="${n}">
+        N${n} <span class="chip-n">${counts[n]}</span>
+      </button>
+    `).join("")}
+  `;
+  els.view.appendChild(filterRow);
+  filterRow.querySelectorAll("[data-f]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const v = b.getAttribute("data-f");
+      go({ name: "readings", level: v === "all" ? "all" : Number(v) });
+    });
+  });
+
+  // --- Full grid (filtered) ---
   const rec = recommendedReadingLevel();
+  const filtered = filterState === "all"
+    ? readings.slice()
+    : readings.filter((r) => r.level === filterState);
+  // Easiest first within a level group
+  filtered.sort((a, b) => b.level - a.level);
+
   const grid = document.createElement("section");
   grid.className = "reading-grid";
-  for (const r of readings) {
+  for (const r of filtered) {
     const card = document.createElement("button");
     const isRec = rec != null && r.level === rec;
     card.className = `reading-card${isRec ? " recommended" : ""}`;
@@ -1449,6 +1527,12 @@ function renderReadingList() {
     grid.appendChild(card);
   }
   els.view.appendChild(grid);
+  if (filtered.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "tier-empty";
+    empty.textContent = "— no readings at this level —";
+    els.view.appendChild(empty);
+  }
 }
 
 function renderReadingDetail(id) {

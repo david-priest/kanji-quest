@@ -27,9 +27,25 @@ const kuromoji = require("kuromoji");
 const dicPath = path.join(__dirname, "..", "node_modules", "kuromoji", "dict");
 const kanjiPath = path.join(__dirname, "..", "data", "jlpt-kanji.json");
 const outPath = path.join(__dirname, "..", "data", "readings.json");
+const tatoebaDir = "/tmp/tatoeba";
+const jpnPath = path.join(tatoebaDir, "jpn_sentences.tsv");
+const engPath = path.join(tatoebaDir, "eng_sentences.tsv");
+const linksPath = path.join(tatoebaDir, "jpn-eng_links.tsv");
 
 const kanji = JSON.parse(fs.readFileSync(kanjiPath, "utf8"));
 const kanjiByChar = new Map(kanji.map((k) => [k.c, k]));
+
+// Kanji partitioned by JLPT level for difficulty caps
+const kanjiByLevel = { 5: new Set(), 4: new Set(), 3: new Set(), 2: new Set(), 1: new Set() };
+for (const k of kanji) if (kanjiByLevel[k.n]) kanjiByLevel[k.n].add(k.c);
+function allowedKanjiUpTo(maxLevel) {
+  const s = new Set();
+  for (const lvl of [5, 4, 3, 2, 1]) {
+    for (const c of kanjiByLevel[lvl]) s.add(c);
+    if (lvl === maxLevel) break;
+  }
+  return s;
+}
 
 const AOZORA = [
   {
@@ -132,6 +148,39 @@ const AOZORA = [
     en: "Two young gentlemen, splendidly equipped like British soldiers, with shining new rifles slung over their shoulders, were tramping through the mountains at a place so deep that even the leaves seemed to whisper. With them they had brought two big dogs the colour of polar bears.",
   },
 ];
+
+// Bulk Aozora additions — many more public-domain folk tales from
+// Kusuyama Masao plus a few from other PD authors. No English
+// translation included for these; users who want one can look up the
+// full text via the source link.
+const AOZORA_BULK = [
+  ["akai-tama",       "赤い玉",            "The Red Jewel",                    "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/33207_17213.html"],
+  ["adachigahara",    "安達が原",          "Adachigahara",                     "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/33208_13245.html"],
+  ["ushiwaka",        "牛若と弁慶",        "Ushiwaka and Benkei",              "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18384_14265.html"],
+  ["oeyama",          "大江山",            "Mount Ōe",                         "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18339_13246.html"],
+  ["kuzunoha",        "葛の葉狐",          "Kuzunoha the Fox",                 "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18386_13247.html"],
+  ["nagai-na",        "長い名",            "The Long Name",                    "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18388_11943.html"],
+  ["mono-no-iware",   "物のいわれ",        "The Origins of Things",            "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18390_13254.html"],
+  ["ippon-no-wara",   "一本のわら",        "A Single Straw",                   "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/43458_23936.html"],
+  ["obasuteyama",     "姨捨山",            "Obasuteyama",                      "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/43460_24403.html"],
+  ["tawara-toda",     "田原藤太",          "Tawara Tōda",                      "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18338_13249.html"],
+  ["rashomon-folk",   "羅生門",            "Rashomon (folk version)",          "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18340_13256.html"],
+  ["hachimantaro",    "八幡太郎",          "Hachiman Tarō",                    "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18341_13252.html"],
+  ["nue",             "鵺",                "Nue",                              "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18342_13251.html"],
+  ["kaminari-no-sazuke","雷のさずけもの",  "The Thunder's Gift",               "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/33209_14866.html"],
+  ["shiroi-tori",     "白い鳥",            "The White Bird",                   "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/33210_13248.html"],
+  ["chugi-na-inu",    "忠義な犬",          "The Loyal Dog",                    "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/33211_13250.html"],
+  ["kachi-kachi",     "かちかち山",        "Kachi-kachi Yama",                 "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18377_11982.html"],
+  ["shita-kiri",      "舌切りすずめ",      "The Tongue-Cut Sparrow",           "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18378_12098.html"],
+  ["kurage-tsukai",   "くらげのお使い",    "The Jellyfish's Errand",           "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18379_12097.html"],
+  ["neko-no-soshi",   "猫の草紙",          "The Cat's Tale",                   "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18380_12099.html"],
+  ["yumedono",        "夢殿",              "The Hall of Dreams",               "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18381_14262.html"],
+  ["tamura-shogun",   "田村将軍",          "General Tamura",                   "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18382_14263.html"],
+  ["chinzei-hachiro", "鎮西八郎",          "Chinzei Hachirō",                  "楠山 正雄", "https://www.aozora.gr.jp/cards/000329/files/18383_14264.html"],
+];
+for (const [id, title, titleEn, author, url] of AOZORA_BULK) {
+  AOZORA.push({ id, title, titleEn, author, url, sentenceLimit: 4 });
+}
 
 // Hand-picked Tatoeba sentences (verified in jpn_sentences.tsv), stitched
 // into mini paragraphs by theme. English translations written from the
@@ -313,6 +362,44 @@ TATOEBA.push(...[
   },
 ]);
 
+// Themed paragraph templates for algorithmic Tatoeba stitching.
+// Each theme picks sentences from Tatoeba that:
+//   - contain >=1 of its `core` kanji
+//   - have all kanji at or easier than `maxLevel`
+//   - have a linked English translation
+// Sentence count and length filters applied uniformly.
+const THEMES = [
+  // ---- N5 / N4-ish ----
+  { id: "th-greeting", core: ["先","生","名","人"], max: 4, title: "あいさつ", titleEn: "Greetings" },
+  { id: "th-family",   core: ["父","母","兄","姉","弟","妹","家","族"], max: 4, title: "家族のこと", titleEn: "About family" },
+  { id: "th-school",   core: ["学","校","先","生","友"], max: 4, title: "学校のこと", titleEn: "About school" },
+  { id: "th-food",     core: ["食","飲","米","魚","肉","水"], max: 4, title: "食べ物の話", titleEn: "About food" },
+  { id: "th-weather",  core: ["天","気","雨","風","空","雪"], max: 4, title: "今日の天気", titleEn: "Today's weather" },
+  { id: "th-time",     core: ["時","分","日","月","年","今"], max: 4, title: "時間", titleEn: "Time" },
+  { id: "th-numbers",  core: ["一","二","三","四","五","六","七","八","九","十","百","千"], max: 4, title: "数字", titleEn: "Numbers" },
+  { id: "th-body",     core: ["目","耳","口","手","足","顔"], max: 4, title: "体", titleEn: "The body" },
+  { id: "th-home",     core: ["家","部","屋","台","所","庭"], max: 4, title: "家のこと", titleEn: "Around the house" },
+  { id: "th-travel",   core: ["旅","駅","電","車","行","来"], max: 4, title: "旅行", titleEn: "Travel" },
+  // ---- N4 / N3 ----
+  { id: "th-shopping", core: ["買","物","店","円","品"], max: 3, title: "買い物", titleEn: "Shopping" },
+  { id: "th-hobby",    core: ["趣","味","本","音","楽","映","画"], max: 3, title: "趣味", titleEn: "Hobbies" },
+  { id: "th-sport",    core: ["走","泳","運","動","球"], max: 3, title: "スポーツ", titleEn: "Sports" },
+  { id: "th-music",    core: ["音","楽","歌","聞"], max: 3, title: "音楽", titleEn: "Music" },
+  { id: "th-cooking",  core: ["料","理","作","食","味","野","菜"], max: 3, title: "料理", titleEn: "Cooking" },
+  { id: "th-transport",core: ["車","電","駅","乗","降","道","橋"], max: 3, title: "乗り物", titleEn: "Transport" },
+  { id: "th-work",     core: ["会","社","仕","事","働"], max: 3, title: "仕事", titleEn: "Work" },
+  { id: "th-friends",  core: ["友","達","話","会","遊"], max: 3, title: "友達と", titleEn: "With friends" },
+  { id: "th-animal",   core: ["犬","猫","鳥","魚","馬"], max: 3, title: "動物", titleEn: "Animals" },
+  { id: "th-feeling",  core: ["楽","好","嬉","悲","怒","心"], max: 3, title: "気持ち", titleEn: "Feelings" },
+  // ---- N3 / N2 ----
+  { id: "th-season",   core: ["春","夏","秋","冬","季","節"], max: 2, title: "季節", titleEn: "Seasons" },
+  { id: "th-nature",   core: ["山","川","海","森","花","木","島"], max: 2, title: "自然", titleEn: "Nature" },
+  { id: "th-city",     core: ["町","村","都","会","建","物"], max: 2, title: "町と村", titleEn: "Town and country" },
+  { id: "th-health",   core: ["病","気","医","薬","体","痛"], max: 2, title: "体の調子", titleEn: "Health" },
+  { id: "th-tech",     core: ["機","械","電","話","計","算"], max: 2, title: "技術", titleEn: "Technology" },
+  { id: "th-edu",      core: ["学","勉","強","試","験","読","書"], max: 2, title: "勉強", titleEn: "Studying" },
+];
+
 function isKanji(ch) {
   const cp = ch.codePointAt(0);
   return (cp >= 0x4e00 && cp <= 0x9fff) || (cp >= 0x3400 && cp <= 0x4dbf);
@@ -454,6 +541,139 @@ function computeLevel(tokens) {
   return 1;
 }
 
+/**
+ * Load Tatoeba JP sentences + jpn-eng links + EN sentence text needed
+ * for the generated paragraphs. Returns:
+ *   { jpSentences: [{id, text}], jpToEng: Map(jpId -> Set<engId>),
+ *     engById: Map(engId -> text) }
+ */
+function loadTatoeba() {
+  if (!fs.existsSync(jpnPath)) return null;
+  console.log("Loading Tatoeba corpora...");
+  const jpRaw = fs.readFileSync(jpnPath, "utf8");
+  const jpSentences = [];
+  for (const line of jpRaw.split("\n")) {
+    if (!line) continue;
+    const parts = line.split("\t");
+    if (parts.length < 3) continue;
+    const id = Number(parts[0]);
+    const text = parts[2].trim();
+    if (!id || !text) continue;
+    if (text.length < 6 || text.length > 25) continue;
+    jpSentences.push({ id, text });
+  }
+
+  const jpToEng = new Map();
+  const linksRaw = fs.readFileSync(linksPath, "utf8");
+  for (const line of linksRaw.split("\n")) {
+    if (!line) continue;
+    const [a, b] = line.split("\t");
+    const jp = Number(a), en = Number(b);
+    if (!jp || !en) continue;
+    if (!jpToEng.has(jp)) jpToEng.set(jp, new Set());
+    jpToEng.get(jp).add(en);
+  }
+
+  // Only load the EN sentences linked to any short JP sentence.
+  const neededEng = new Set();
+  for (const { id } of jpSentences) {
+    const set = jpToEng.get(id);
+    if (set) for (const e of set) neededEng.add(e);
+  }
+  const engById = new Map();
+  const engRaw = fs.readFileSync(engPath, "utf8");
+  for (const line of engRaw.split("\n")) {
+    if (!line) continue;
+    const parts = line.split("\t");
+    if (parts.length < 3) continue;
+    const id = Number(parts[0]);
+    if (!neededEng.has(id)) continue;
+    engById.set(id, parts[2].trim());
+  }
+  console.log(`  ${jpSentences.length} JP / ${jpToEng.size} linked / ${engById.size} EN`);
+  return { jpSentences, jpToEng, engById };
+}
+
+/** Generate themed paragraphs by sampling short Tatoeba sentences. */
+function generateThemed(themes, t, tokenizer) {
+  if (!t) return [];
+  const { jpSentences, jpToEng, engById } = t;
+
+  // Pre-index sentences by each kanji they contain
+  const sentenceByKanji = new Map();
+  for (const s of jpSentences) {
+    const seen = new Set();
+    for (const ch of s.text) {
+      if (!isKanji(ch) || seen.has(ch)) continue;
+      seen.add(ch);
+      if (!sentenceByKanji.has(ch)) sentenceByKanji.set(ch, []);
+      sentenceByKanji.get(ch).push(s);
+    }
+  }
+
+  const pickFor = (theme, count, exclude) => {
+    const allowed = allowedKanjiUpTo(theme.max);
+    // Pull candidates: any sentence containing any core kanji
+    const candidatesById = new Map();
+    for (const c of theme.core) {
+      const arr = sentenceByKanji.get(c) ?? [];
+      for (const s of arr) {
+        if (exclude.has(s.id)) continue;
+        if (candidatesById.has(s.id)) continue;
+        // Every kanji in the sentence must be in the allowed set
+        let ok = true;
+        for (const ch of s.text) {
+          if (!isKanji(ch)) continue;
+          if (!allowed.has(ch)) { ok = false; break; }
+        }
+        if (!ok) continue;
+        // Must have a linked EN
+        const ens = jpToEng.get(s.id);
+        if (!ens) continue;
+        let en = null;
+        for (const e of ens) {
+          const t = engById.get(e);
+          if (t) { en = t; break; }
+        }
+        if (!en) continue;
+        candidatesById.set(s.id, { jp: s.text, en, id: s.id });
+      }
+    }
+    const arr = [...candidatesById.values()];
+    if (arr.length < count) return null;
+    // Shortest first, then take `count` distinct ones
+    arr.sort((a, b) => a.jp.length - b.jp.length);
+    return arr.slice(0, count);
+  };
+
+  const out = [];
+  for (const theme of themes) {
+    const used = new Set();
+    // Generate up to two paragraphs per theme so we get variety
+    for (let variant = 0; variant < 3; variant++) {
+      const picked = pickFor(theme, 4, used);
+      if (!picked) break;
+      for (const p of picked) used.add(p.id);
+      const jpText = picked.map((p) => p.jp).join("");
+      const enText = picked.map((p) => p.en).join(" ");
+      const tokens = plainToTokens(jpText, tokenizer);
+      const level = computeLevel(tokens);
+      out.push({
+        id: variant === 0 ? theme.id : `${theme.id}-${variant + 1}`,
+        title: variant === 0 ? theme.title : `${theme.title} ${variant + 1}`,
+        titleEn: variant === 0 ? theme.titleEn : `${theme.titleEn} (${variant + 1})`,
+        source: "Tatoeba (themed)",
+        sourceUrl: "https://tatoeba.org",
+        license: "CC-BY 2.0 FR",
+        level,
+        tokens,
+        en: enText,
+      });
+    }
+  }
+  return out;
+}
+
 async function main() {
   console.log("Building kuromoji tokenizer...");
   const tokenizer = await new Promise((resolve, reject) => {
@@ -503,6 +723,14 @@ async function main() {
       en: p.en,
     });
     console.log(`Stitched ${p.id}: level N${level}, ${tokens.length} tokens`);
+  }
+
+  // --- Algorithmic themed Tatoeba paragraphs ---
+  const tatoeba = loadTatoeba();
+  const themed = generateThemed(THEMES, tatoeba, tokenizer);
+  for (const t of themed) {
+    out.push(t);
+    console.log(`Themed ${t.id}: level N${t.level}, ${t.tokens.length} tokens`);
   }
 
   // Sort easiest (N5) → hardest (N1)

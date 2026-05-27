@@ -928,6 +928,55 @@ button.tier-pill:hover { background: var(--bg-elev); }
   margin-left: 10px;
 }
 
+.reading-today {
+  display: block; width: 100%; text-align: left;
+  padding: 16px 18px 14px;
+  margin: 4px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(400px 200px at 100% -20%, rgba(147, 51, 234, .10), transparent 60%),
+    linear-gradient(160deg, #ffffff 0%, #f4f0fb 100%);
+  box-shadow: var(--shadow);
+  transition: transform .08s ease, background .12s ease;
+}
+.reading-today:hover { background: linear-gradient(160deg, #fffefe 0%, #ece3fa 100%); }
+.reading-today:active { transform: translateY(1px); }
+.today-label {
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--purple); font-weight: 800;
+  margin-bottom: 8px;
+}
+.today-date {
+  font-size: 12px; color: var(--text-mute);
+  font-variant-numeric: tabular-nums;
+}
+.reading-today .reading-title { font-size: 26px; margin-top: 6px; }
+
+.reading-filters {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.reading-filters .chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: background .12s ease;
+}
+.reading-filters .chip:hover { background: var(--bg-elev-2); }
+.reading-filters .chip.selected {
+  background: var(--blue);
+  border-color: transparent;
+  color: white;
+}
+.reading-filters .chip-n {
+  font-size: 11px; opacity: .75; font-weight: 700;
+}
+.reading-filters .chip.selected .chip-n { opacity: 1; }
+
 .reading-grid {
   display: grid; gap: 10px;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
